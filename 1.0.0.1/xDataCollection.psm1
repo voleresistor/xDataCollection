@@ -10,6 +10,8 @@
             Added Get-FolderSize
             Added PS Help comments
             Convert to module via manifest file
+        05/23/16 - v1.0.0.2
+            Added Get-Password
 #>
 
 #region Get-MemoryStats
@@ -567,5 +569,122 @@ function Get-FolderSize
     Path    SizeInGB SizeInMB SizeInKB
     ----    -------- -------- --------
     C:\temp 2.69     2,752.32 2,818,380.25
+#>
+#endregion
+
+#region Get-Password
+function Get-Password
+{
+    <#
+    .Synopsis
+    Generate random passwords.
+    
+    .Description
+    Generate random passwords. Length defaults to 12 characters. Special characters, numbers, and capital
+    letters can be removed using switches. Do not use this where high security is required. The method used
+    in this function has some inherent weaknesses that could potentially be used to exploit it.
+    
+    .Parameter PasswordLength
+    An integer describing the number of characters to select for the password.
+    
+    .Parameter NoSpecialChars
+    Switch disabling the use of special characters in the password.
+    
+    .Parameter NoCaps
+    Switch disabling the use of capital letters in the password.
+    
+    .Parameter NoNumbers
+    Switch disabling the use of numbers in the password. 
+    
+    .Example
+    Get-Password
+    
+    Get a 12 chracter password including at least 1 of each of the following:
+        - Numbers
+        - Upper case letters
+        - Lower case letters
+        - Special characters
+    
+    .Example
+    Get-Password -NoSpecialChars
+    
+    Get a 12 character password without special characters.
+    
+    .Example
+    Get-Password -PasswordLength 24
+    
+    Get a 24 chracter password including at least 1 of each of the following:
+        - Numbers
+        - Upper case letters
+        - Lower case letters
+        - Special characters
+    #>
+    param
+    (
+        [int]$PasswordLength = 12,
+        [switch]$NoSpecialChars,
+        [switch]$NoCaps,
+        [switch]$NoNumbers
+    )
+    
+    <#
+        Define charsets and match strings
+        The method being used to choose random chars removes a char from the list when choosing it
+        so lists are tripled. This is not the most secure method of generating a password because of
+        the removal of these characters. Do not use this is true security is necessary
+    #>
+    $lowerChars = 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz'
+    $lowerMatch = '[a-z]{1,}'
+    $capitalChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    $capitalMatch = '[A-Z]{1,}'
+    $specialChars = '!$%&*#!$%&*#!$%&*#'
+    $specialMatch = '[!$%&*#]{1,}'
+    $numChars = '123456789012345678901234567890'
+    $numMatch = '[0-9]{1,}'
+    
+    $pwdChars = $lowerChars
+    $matchString = ".*$lowerMatch"
+    
+    # Create list of potential password chars and match strings
+    if (!($NoCaps))
+    {
+        $pwdChars += $capitalChars
+        $matchString += ".*$capitalMatch"
+    }
+    
+    if (!($NoSpecialChars))
+    {
+        $pwdChars += $specialChars
+        $matchString += ".*$specialMatch"
+    }
+    
+    if (!($NoNumbers))
+    {
+        $pwdChars += $numChars
+        $matchString += ".*$numMatch"
+    }
+    
+    $matchString += '.*'
+    
+    # Create and check new passwords until match is valid
+    while ($true)
+    {
+        $passwdString = -join ($pwdChars.ToCharArray() | Get-Random -Count $PasswordLength)
+        
+        if ($passwdString -match $matchString)
+        {
+            return $passwdString
+        }
+    }
+}
+<#
+Expected output:
+
+    PS C:\temp> Get-Password
+    71s*Q#j3c2#G
+    PS C:\temp> Get-Password -NoSpecialChars
+    cYGjDJ6IhusZ
+    PS C:\temp> Get-Password -PasswordLength 20
+    TSJCBldFs4Rurs8!9RmN
 #>
 #endregion
