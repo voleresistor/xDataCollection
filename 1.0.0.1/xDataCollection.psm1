@@ -10,8 +10,9 @@
             Added Get-FolderSize
             Added PS Help comments
             Convert to module via manifest file
-        05/23/16 - v1.0.0.2
+        05/24/16 - v1.0.0.2
             Added Get-Password
+                Extend number of special characters supported
 #>
 
 #region Get-MemoryStats
@@ -581,8 +582,7 @@ function Get-Password
     
     .Description
     Generate random passwords. Length defaults to 12 characters. Special characters, numbers, and capital
-    letters can be removed using switches. Do not use this where high security is required. The method used
-    in this function has some inherent weaknesses that could potentially be used to exploit it.
+    letters can be removed using switches.
     
     .Parameter PasswordLength
     An integer describing the number of characters to select for the password.
@@ -633,13 +633,13 @@ function Get-Password
         so lists are tripled. This is not the most secure method of generating a password because of
         the removal of these characters. Do not use this is true security is necessary
     #>
-    $lowerChars = 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz'
+    $lowerChars = 'abcdefghijklmnopqrstuvwxyz'
     $lowerMatch = '[a-z]{1,}'
-    $capitalChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    $capitalChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     $capitalMatch = '[A-Z]{1,}'
-    $specialChars = '!$%&*#!$%&*#!$%&*#'
-    $specialMatch = '[!$%&*#]{1,}'
-    $numChars = '123456789012345678901234567890'
+    $specialChars = '`~!@#$%^&*-+_=|:;<>,.?'
+    $specialMatch = '[`~!@#$%^&*-+_=|:;<>,.?]{1,}'
+    $numChars = '1234567890'
     $numMatch = '[0-9]{1,}'
     
     $pwdChars = $lowerChars
@@ -669,7 +669,7 @@ function Get-Password
     # Create and check new passwords until match is valid
     while ($true)
     {
-        $passwdString = -join ($pwdChars.ToCharArray() | Get-Random -Count $PasswordLength)
+        $passwdString = -join ($pwdChars.ToCharArray() * 100 | Get-Random -Count $PasswordLength)
         
         if ($passwdString -match $matchString)
         {
