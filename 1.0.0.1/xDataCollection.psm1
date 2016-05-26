@@ -688,3 +688,57 @@ Expected output:
     TSJCBldFs4Rurs8!9RmN
 #>
 #endregion
+
+#region Get-TempSize
+function Get-TempSize
+{
+<#
+    .Synopsis
+    Get used space in user temp folders.
+    
+    .Description
+    Gathers used space in temp folders based on minimum age. This is to collect information
+    on stale data in temp folders which could be purged.
+    
+    .Parameter Admin
+    Assuming user has admin rights, get space in C:\Windows\Temp.
+    
+    .Parameter MinAge
+    Minimum age in months to search for when selecting files. Defaults to 3 months.
+    
+    .Example
+    Get-TempSize
+    
+    Get total size of files older than 3 months in user's temp folder.
+    #>
+    param
+    (
+        [switch]$Admin,
+        [int]$MinAge = 3
+    )
+    
+    if ($Admin)
+    {
+        #Requires -RunAsAdministrator
+        $tempFolder = "$env:windir\temp"
+    }
+    else
+    {
+        $tempFolder = "$env:temp"
+    }
+    
+    # look at temp files older than 3 months 
+    $cutoff = (Get-Date).AddMonths(-$MinAge)
+    
+    $space = Get-ChildItem "$tempFolder" -Recurse -Force |
+        Where-Object { $_.LastWriteTime -lt $cutoff } |
+        Measure-Object -Property Length -Sum |
+        Select-Object -ExpandProperty Sum
+        
+    return ("Space used in $tempFolder`: {0:n1} MB" -f ($space/1MB))
+}
+<#
+    PS C:\> Get-TempSize
+    Space used in C:\Users\user1\AppData\Local\Temp: 25.4 MB
+#>
+#endregion
