@@ -689,16 +689,15 @@ Expected output:
 #>
 #endregion
 
-#region Get-TempSize
-function Get-TempSize
+#region Get-OldFiles
+function Get-OldFiles
 {
 <#
     .Synopsis
-    Get used space in user temp folders.
+    Display and reclaim used space in folders.
     
     .Description
-    Gathers used space in temp folders based on minimum age. This is to collect information
-    on stale data in temp folders which could be purged.
+    Gathers used space in folders based on minimum age. This data can be used to purge old files.
     
     .Parameter Admin
     Assuming user has admin rights, get space in C:\Windows\Temp.
@@ -713,29 +712,59 @@ function Get-TempSize
     #>
     param
     (
-        [switch]$Admin,
-        [int]$MinAge = 3
+        [int]$MinAge = 3,
+        [string]$Path = ".",
+        [bool]$Delete
     )
-    
-    if ($Admin)
-    {
-        #Requires -RunAsAdministrator
-        $tempFolder = "$env:windir\temp"
-    }
-    else
-    {
-        $tempFolder = "$env:temp"
-    }
     
     # look at temp files older than 3 months 
     $cutoff = (Get-Date).AddMonths(-$MinAge)
     
-    $space = Get-ChildItem "$tempFolder" -Recurse -Force |
+    if ($Delete)
+    {
+        # use an ordered hash table to store logging info 
+        $sizes = [Ordered]@{}
+         
+        # find all files in both temp folders recursively 
+        Get-ChildItem "$env:windir\temp", $env:temp -Recurse -Force -File |
+        # calculate total size before cleanup 
+        ForEach-Object { 
+          $sizes['TotalSize'] += $_.Length 
+          $_
+        } |
+        # take only outdated files 
         Where-Object { $_.LastWriteTime -lt $cutoff } |
-        Measure-Object -Property Length -Sum |
-        Select-Object -ExpandProperty Sum
-        
-    return ("Space used in $tempFolder`: {0:n1} MB" -f ($space/1MB))
+        # try to delete. Add retrieved file size only 
+        # if the file could be deleted 
+        ForEach-Object {
+          try
+          { 
+            $fileSize = $_.Length
+            # ATTENTION: REMOVE -WHATIF AT OWN RISK
+            # WILL DELETE FILES AND RETRIEVE STORAGE SPACE
+            # ONLY AFTER YOU REMOVED -WHATIF
+            Remove-Item -Path $_.FullName -ErrorAction SilentlyContinue
+            $sizes['Retrieved'] += $fileSize
+          }
+          catch {}
+        }
+         
+         
+        # turn bytes into MB 
+        $Sizes['TotalSizeMB'] = [Math]::Round(($Sizes['TotalSize']/1MB), 1)
+        $Sizes['RetrievedMB'] = [Math]::Round(($Sizes['Retrieved']/1MB), 1)
+         
+        New-Object -TypeName PSObject -Property $sizes
+    }
+    else
+    {
+        $space = Get-ChildItem "$Path" -Recurse -Force |
+            Where-Object { $_.LastWriteTime -lt $cutoff } |
+            Measure-Object -Property Length -Sum |
+            Select-Object -ExpandProperty Sum
+            
+        return ("Space used in $Path`: {0:n1} MB" -f ($space/1MB))
+    }
 }
 <#
     PS C:\> Get-TempSize
