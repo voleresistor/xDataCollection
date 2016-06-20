@@ -771,3 +771,58 @@ function Get-OldFiles
     Space used in C:\Users\user1\AppData\Local\Temp: 25.4 MB
 #>
 #endregion
+
+#region Get-DiskSize
+function Get-DiskSize
+{
+<#
+    .Synopsis
+    Display free and total space on remote and local logical disks.
+    
+    .Description
+    Display free and total space on all remote and local logical disks using WMI.
+    
+    .Parameter ComputerName
+    Name of target computer. Defaults to localhost.
+    
+    .Example
+    Get-DiskSize
+    
+    Get free and total space in GB on local computer.
+    #>
+    param
+    (
+        [string]$ComputerName = $env:computername
+    )
+    
+    $Disks = Get-WmiObject -Class win32_logicaldisk -ComputerName $ComputerName
+    
+    foreach ($disk in $Disks)
+    {
+        $disk.FreeSpace = "{0:N2}" -f ($disk.FreeSpace / 1gb)
+        $disk.size = "{0:N2}" -f ($disk.Size / 1gb)
+    }
+    
+    return $Disks
+}
+<#
+    PS C:\> Get-DiskSize 
+                     
+    DeviceID     : C:    
+    DriveType    : 3     
+    ProviderName :       
+    FreeSpace    : 42    
+    Size         : 232   
+    VolumeName   : OSDisk
+                         
+    DeviceID     : D:    
+    DriveType    : 3     
+    ProviderName :       
+    FreeSpace    : 302   
+    Size         : 466   
+    VolumeName   : Data  
+    
+    PS C:\>
+                     
+#>
+#endregion
