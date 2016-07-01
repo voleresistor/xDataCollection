@@ -868,14 +868,10 @@ function Get-DFSRStats
             $Formatted = "{0:N2}" -f ($iNum / 1gb)
             $Final = $Formatted + " GB"
         }
-        elseif (($iNum / 1mb) -gt 1)
+        else
         {
             $Formatted = "{0:N2}" -f ($iNum / 1mb)
             $Final = $Formatted + " MB"
-        }
-        else
-        {
-            $Final = '0 MB'
         }
         
         return $Final
@@ -920,10 +916,10 @@ function Get-DFSRStats
     ComputerName           : dfs-01.domain.com
     GroupName              : ReplGroup-{z69tb0ym-576v-a8c3-1rsc-7qzjnkqgei8h}
     ConflictSpaceGenerated : 8.17 MB
-    ConflictSpaceCleaned   : 0 MB
+    ConflictSpaceCleaned   : 0.00 MB
     ConflictSpaceUsed      : 8.17 MB
     DeletedSpaceGenerated  : 3.12 GB
-    DeletedSpaceCleaned    : 0 MB
+    DeletedSpaceCleaned    : 0.00 MB
     DeletedSpaceUsed       : 3.12 GB
     StagingSpaceGenerated  : 1.09 TB
     StagingSpaceCleaned    : 1.01 TB
