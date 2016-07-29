@@ -6,15 +6,18 @@
     
     Changelog:
         04/25/16 - v1.0.0.1
-            Added Get-InstalledSoftware
-            Added Get-FolderSize
-            Added PS Help comments
+            Add Get-InstalledSoftware
+            Add Get-FolderSize
+            Add PS Help comments
             Convert to module via manifest file
         05/24/16 - v1.0.0.2
-            Added Get-Password
+            Add Get-Password
                 Extend number of special characters supported
         07/01/16 - v1.0.0.3
-            Added Get-DFSRStats
+            Add Get-DFSRStats
+        07/29/16 - v1.0.0.4
+            Add Set-FutureRestart
+            Add Get-LocalTime
 #>
 
 #region Get-MemoryStats
@@ -926,4 +929,97 @@ function Get-DFSRStats
     StagingSpaceUsed       : 159.76 GB
     UpdatesDropped         : 0
 #>
+#endregion
+
+#region Get-LocalTime
+Function Get-LocalTime($UTCTime)
+{
+    <#
+    .Synopsis
+    Convert UTC to local time.
+    
+    .Description
+    Using local timezone data, convert UTC/GMT time to local time.
+    
+    .Parameter UTCTime
+    A UTC datetime object or string which PowerShell can interpret as a datetime.
+    
+    .Example
+    Get-LocalTime -UTCTime "21:00 07/30/16"
+    
+    Get UTC time converted to local time.
+    #>
+    $strCurrentTimeZone = (Get-WmiObject win32_timezone).StandardName
+    $TZ = [System.TimeZoneInfo]::FindSystemTimeZoneById($strCurrentTimeZone)
+    $LocalTime = [System.TimeZoneInfo]::ConvertTimeFromUtc($UTCTime, $TZ)
+    Return $LocalTime
+}
+<#
+    PS C:\> Get-LocalTime -UTCTime "21:00 07/30/16"
+    
+    Saturday, July 30, 2016 4:00:00 PM
+    PS C:\>
+#>
+#endregion
+
+#region Set-FutureRestart
+function Set-FutureRestart
+{
+    <#
+    .Synopsis
+    Schedule a reboot on local or remote computer.
+    
+    .Description
+    Use PowerShell and PowerShell remoting to create a one time scheduled task on the local or remote host.
+    
+    .Parameter RestartTime
+    A string which can be interpreted as a DateTime object. This is the time you'd like the restart to be executed. Defaults to 9:00PM.
+    
+    .Parameter ComputerName
+    The name of the target computer. Defaults to localhost.
+    
+    .Parameter Name
+    Name of the scheduled task as it will appear in Task Scheduler. Defaults to 'Scheduled Restart.'
+    
+    .Parameter Description
+    Description applied to the scheduled task in Task Scheduler. Defaults to 'Scheduled after-hours restart.'
+    
+    .Example
+    Set-FutureRestart
+    
+    Schedule the local computer to restart at 9:00PM.
+    
+    .Example
+    Set-FutureRestart -ComputerName 'remote.domain.com' -RestartTime 23:50
+    
+    Schedule the remote host 'remote.domain.com' to restart at 11:50PM.
+    #>
+    param
+    (
+        [datetime]$RestartTime = '21:00',
+        [string]$Computername = $env:localhost,
+        [string]$Name = 'Scheduled Restart',
+        [string]$Description = 'Scheduled after-hours restart.'
+    )
+
+    Invoke-Command -ComputerName 'houmdtdev.dxpe.com' -Args $RestartTime,$Name,$Description -ScriptBlock{
+        $ExePath = "%windir%\System32\WindowsPowerShell\v1.0\PowerShell.exe"
+        $ActionArg = '-NoProfile -WindowStyle Hidden -Command "Restart-Computer -Force"'
+        $TaskName = $args[1]
+        $TaskDesc = $args[2]
+        $RunTime = $args[0]
+        
+        #Make sure we delete any previously scheduled restarts
+        if (Get-ScheduledTask -TaskName $TaskName -ErrorAction Ignore)
+        {
+            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+        }
+        
+        #Register this MOF to enable PowerShell task scheduling
+        mofcomp C:\Windows\System32\wbem\SchedProv.mof
+        $STAction = New-ScheduledTaskAction -Execute $ExePath -Argument $ActionArg
+        $STTrigger = New-ScheduledTaskTrigger -Once -At $RunTime
+        Register-ScheduledTask -TaskName $TaskName -Description $TaskDesc -User 'SYSTEM' -Action $STAction -Trigger $STTrigger
+    }
+}
 #endregion
