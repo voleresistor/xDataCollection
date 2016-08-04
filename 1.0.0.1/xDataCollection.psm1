@@ -6,10 +6,20 @@
     
     Changelog:
         04/25/16 - v1.0.0.1
-            Added Get-InstalledSoftware
-            Added Get-FolderSize
-            Added PS Help comments
+            Add Get-InstalledSoftware
+            Add Get-FolderSize
+            Add PS Help comments
             Convert to module via manifest file
+        05/24/16 - v1.0.0.2
+            Add Get-Password
+                Extend number of special characters supported
+        07/01/16 - v1.0.0.3
+            Add Get-DFSRStats
+        07/29/16 - v1.0.0.4
+            Add Set-FutureRestart
+            Add Get-LocalTime
+        08/04/16
+            Add Get-BLStatus
 #>
 
 #region Get-MemoryStats
@@ -568,4 +578,495 @@ function Get-FolderSize
     ----    -------- -------- --------
     C:\temp 2.69     2,752.32 2,818,380.25
 #>
+#endregion
+
+#region Get-Password
+function Get-Password
+{
+    <#
+    .Synopsis
+    Generate random passwords.
+    
+    .Description
+    Generate random passwords. Length defaults to 12 characters. Special characters, numbers, and capital
+    letters can be removed using switches.
+    
+    .Parameter PasswordLength
+    An integer describing the number of characters to select for the password.
+    
+    .Parameter NoSpecialChars
+    Switch disabling the use of special characters in the password.
+    
+    .Parameter NoCaps
+    Switch disabling the use of capital letters in the password.
+    
+    .Parameter NoNumbers
+    Switch disabling the use of numbers in the password. 
+    
+    .Example
+    Get-Password
+    
+    Get a 12 chracter password including at least 1 of each of the following:
+        - Numbers
+        - Upper case letters
+        - Lower case letters
+        - Special characters
+    
+    .Example
+    Get-Password -NoSpecialChars
+    
+    Get a 12 character password without special characters.
+    
+    .Example
+    Get-Password -PasswordLength 24
+    
+    Get a 24 chracter password including at least 1 of each of the following:
+        - Numbers
+        - Upper case letters
+        - Lower case letters
+        - Special characters
+    #>
+    param
+    (
+        [int]$PasswordLength = 12,
+        [switch]$NoSpecialChars,
+        [switch]$NoCaps,
+        [switch]$NoNumbers
+    )
+    
+    <#
+        Define charsets and match strings
+        The method being used to choose random chars removes a char from the list when choosing it
+        so lists are tripled. This is not the most secure method of generating a password because of
+        the removal of these characters. Do not use this is true security is necessary
+    #>
+    $lowerChars = 'abcdefghijklmnopqrstuvwxyz'
+    $lowerMatch = '[a-z]{1,}'
+    $capitalChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    $capitalMatch = '[A-Z]{1,}'
+    $specialChars = '`~!@#$%^&*-+_=|:;<>,.?'
+    $specialMatch = '[`~!@#$%^&*-+_=|:;<>,.?]{1,}'
+    $numChars = '1234567890'
+    $numMatch = '[0-9]{1,}'
+    
+    $pwdChars = $lowerChars
+    $matchString = ".*$lowerMatch"
+    
+    # Create list of potential password chars and match strings
+    if (!($NoCaps))
+    {
+        $pwdChars += $capitalChars
+        $matchString += ".*$capitalMatch"
+    }
+    
+    if (!($NoSpecialChars))
+    {
+        $pwdChars += $specialChars
+        $matchString += ".*$specialMatch"
+    }
+    
+    if (!($NoNumbers))
+    {
+        $pwdChars += $numChars
+        $matchString += ".*$numMatch"
+    }
+    
+    $matchString += '.*'
+    
+    # Create and check new passwords until match is valid
+    while ($true)
+    {
+        $passwdString = -join ($pwdChars.ToCharArray() * 100 | Get-Random -Count $PasswordLength)
+        
+        if ($passwdString -match $matchString)
+        {
+            return $passwdString
+        }
+    }
+}
+<#
+Expected output:
+
+    PS C:\temp> Get-Password
+    71s*Q#j3c2#G
+    PS C:\temp> Get-Password -NoSpecialChars
+    cYGjDJ6IhusZ
+    PS C:\temp> Get-Password -PasswordLength 20
+    TSJCBldFs4Rurs8!9RmN
+#>
+#endregion
+
+#region Get-OldFiles
+function Get-OldFiles
+{
+<#
+    .Synopsis
+    Display and reclaim used space in folders.
+    
+    .Description
+    Gathers used space in folders based on minimum age. This data can be used to purge old files.
+    
+    .Parameter Admin
+    Assuming user has admin rights, get space in C:\Windows\Temp.
+    
+    .Parameter MinAge
+    Minimum age in months to search for when selecting files. Defaults to 3 months.
+    
+    .Example
+    Get-TempSize
+    
+    Get total size of files older than 3 months in user's temp folder.
+    #>
+    param
+    (
+        [int]$MinAge = 3,
+        [string]$Path = ".",
+        [bool]$Delete
+    )
+    
+    # look at temp files older than 3 months 
+    $cutoff = (Get-Date).AddMonths(-$MinAge)
+    
+    if ($Delete)
+    {
+        # use an ordered hash table to store logging info 
+        $sizes = [Ordered]@{}
+         
+        # find all files in both temp folders recursively 
+        Get-ChildItem "$env:windir\temp", $env:temp -Recurse -Force -File |
+        # calculate total size before cleanup 
+        ForEach-Object { 
+          $sizes['TotalSize'] += $_.Length 
+          $_
+        } |
+        # take only outdated files 
+        Where-Object { $_.LastWriteTime -lt $cutoff } |
+        # try to delete. Add retrieved file size only 
+        # if the file could be deleted 
+        ForEach-Object {
+          try
+          { 
+            $fileSize = $_.Length
+            # ATTENTION: REMOVE -WHATIF AT OWN RISK
+            # WILL DELETE FILES AND RETRIEVE STORAGE SPACE
+            # ONLY AFTER YOU REMOVED -WHATIF
+            Remove-Item -Path $_.FullName -ErrorAction SilentlyContinue
+            $sizes['Retrieved'] += $fileSize
+          }
+          catch {}
+        }
+         
+         
+        # turn bytes into MB 
+        $Sizes['TotalSizeMB'] = [Math]::Round(($Sizes['TotalSize']/1MB), 1)
+        $Sizes['RetrievedMB'] = [Math]::Round(($Sizes['Retrieved']/1MB), 1)
+         
+        New-Object -TypeName PSObject -Property $sizes
+    }
+    else
+    {
+        $space = Get-ChildItem "$Path" -Recurse -Force |
+            Where-Object { $_.LastWriteTime -lt $cutoff } |
+            Measure-Object -Property Length -Sum |
+            Select-Object -ExpandProperty Sum
+            
+        return ("Space used in $Path`: {0:n1} MB" -f ($space/1MB))
+    }
+}
+<#
+    PS C:\> Get-TempSize
+    Space used in C:\Users\user1\AppData\Local\Temp: 25.4 MB
+#>
+#endregion
+
+#region Get-DiskSize
+function Get-DiskSize
+{
+    <#
+        .Synopsis
+        Display free and total space on remote and local logical disks.
+        
+        .Description
+        Display free and total space on all remote and local logical disks using WMI.
+        
+        .Parameter ComputerName
+        Name of target computer. Defaults to localhost.
+        
+        .Example
+        Get-DiskSize
+        
+        Get free and total space in GB on local computer.
+    #>
+    param
+    (
+        [string]$ComputerName = $env:computername
+    )
+    
+    $Disks = Get-WmiObject -Class win32_logicaldisk -ComputerName $ComputerName
+    
+    foreach ($disk in $Disks)
+    {
+        $disk.FreeSpace = "{0:N2}" -f ($disk.FreeSpace / 1gb)
+        $disk.size = "{0:N2}" -f ($disk.Size / 1gb)
+    }
+    
+    return $Disks
+}
+<#
+    PS C:\> Get-DiskSize 
+                     
+    DeviceID     : C:    
+    DriveType    : 3     
+    ProviderName :       
+    FreeSpace    : 42    
+    Size         : 232   
+    VolumeName   : OSDisk
+                         
+    DeviceID     : D:    
+    DriveType    : 3     
+    ProviderName :       
+    FreeSpace    : 302   
+    Size         : 466   
+    VolumeName   : Data  
+    
+    PS C:\>
+                     
+#>
+#endregion
+
+#region Get-DFSRStats
+function Get-DFSRStats
+{
+    <#
+        .Synopsis
+        Gather DFSR health stats from WMI.
+        
+        .Description
+        Collect statistics about DFSR health including staging space in use and replication updates dropped.
+        
+        .Parameter ComputerName
+        Name of target computer. Defaults to localhost.
+        
+        .Parameter ReplicationGroupName
+        String to search for in replication group name. This can contain wildcards.
+        
+        .Example
+        Get-DFSRStats -ComputerName dfs-01.domain.com
+        
+        Get formatted DFSR stats from specified DFS server.
+    #>
+    param
+    (
+        [string]$ComputerName = "$env:ComputerName",
+        [string]$ReplicationGroupName
+    )
+    
+    function Get-Size($iNum)
+    {
+        if (($iNum / 1tb) -gt 1)
+        {
+            $Formatted = "{0:N2}" -f ($iNum / 1tb)
+            $Final = $Formatted + " TB"
+        }
+        elseif (($iNum / 1gb) -gt 1)
+        {
+            $Formatted = "{0:N2}" -f ($iNum / 1gb)
+            $Final = $Formatted + " GB"
+        }
+        else
+        {
+            $Formatted = "{0:N2}" -f ($iNum / 1mb)
+            $Final = $Formatted + " MB"
+        }
+        
+        return $Final
+    }
+    
+    $ReplicationGroups = Get-CimInstance -ClassName 'Win32_PerfFormattedData_dfsr_DFSReplicatedFolders'`
+        -ComputerName $computerName
+    
+    $RepGroups = @()
+    
+    foreach ($Group in $ReplicationGroups)
+    {
+        $DFSRObj = New-Object -TypeName PSObject
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'ComputerName' -Value $($Group.PSComputerName)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'GroupName' -Value $($Group.Name)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'ConflictSpaceGenerated' -Value (Get-Size -iNum $Group.ConflictBytesGenerated)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'ConflictSpaceCleaned' -Value (Get-Size -iNum $Group.ConflictBytesCleanedup)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'ConflictSpaceUsed' -Value (Get-Size -iNum $Group.ConflictSpaceInUse)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'DeletedSpaceGenerated' -Value (Get-Size -iNum $Group.DeletedBytesGenerated)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'DeletedSpaceCleaned' -Value (Get-Size -iNum $Group.DeletedBytesCleanedup)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'DeletedSpaceUsed' -Value (Get-Size -iNum $Group.DeletedSpaceInUse)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'StagingSpaceGenerated' -Value (Get-Size -iNum $Group.StagingBytesGenerated)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'StagingSpaceCleaned' -Value (Get-Size -iNum $Group.StagingBytesCleanedup)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'StagingSpaceUsed' -Value (Get-Size -iNum $Group.StagingSpaceInUse)
+        $DFSRObj | Add-Member -MemberType NoteProperty -Name 'UpdatesDropped' -Value $($Group.UpdatesDropped)
+        
+        $RepGroups += $DFSRObj
+    }
+    
+    if (!($ReplicationGroupName))
+    {
+        return $RepGroups
+    }
+    else
+    {
+        return $RepGroups | Where-Object {$_.GroupName -like $ReplicationGroupName}
+    }
+}
+<#
+    C:\> Get-DFSRStats
+    
+    ComputerName           : dfs-01.domain.com
+    GroupName              : ReplGroup-{z69tb0ym-576v-a8c3-1rsc-7qzjnkqgei8h}
+    ConflictSpaceGenerated : 8.17 MB
+    ConflictSpaceCleaned   : 0.00 MB
+    ConflictSpaceUsed      : 8.17 MB
+    DeletedSpaceGenerated  : 3.12 GB
+    DeletedSpaceCleaned    : 0.00 MB
+    DeletedSpaceUsed       : 3.12 GB
+    StagingSpaceGenerated  : 1.09 TB
+    StagingSpaceCleaned    : 1.01 TB
+    StagingSpaceUsed       : 159.76 GB
+    UpdatesDropped         : 0
+#>
+#endregion
+
+#region Get-LocalTime
+Function Get-LocalTime($UTCTime)
+{
+    <#
+    .Synopsis
+    Convert UTC to local time.
+    
+    .Description
+    Using local timezone data, convert UTC/GMT time to local time.
+    
+    .Parameter UTCTime
+    A UTC datetime object or string which PowerShell can interpret as a datetime.
+    
+    .Example
+    Get-LocalTime -UTCTime "21:00 07/30/16"
+    
+    Get UTC time converted to local time.
+    #>
+    $strCurrentTimeZone = (Get-WmiObject win32_timezone).StandardName
+    $TZ = [System.TimeZoneInfo]::FindSystemTimeZoneById($strCurrentTimeZone)
+    $LocalTime = [System.TimeZoneInfo]::ConvertTimeFromUtc($UTCTime, $TZ)
+    Return $LocalTime
+}
+<#
+    PS C:\> Get-LocalTime -UTCTime "21:00 07/30/16"
+    
+    Saturday, July 30, 2016 4:00:00 PM
+    PS C:\>
+#>
+#endregion
+
+#region Set-FutureRestart
+function Set-FutureRestart
+{
+    <#
+    .Synopsis
+    Schedule a reboot on local or remote computer.
+    
+    .Description
+    Use PowerShell and PowerShell remoting to create a one time scheduled task on the local or remote host.
+    
+    .Parameter RestartTime
+    A string which can be interpreted as a DateTime object. This is the time you'd like the restart to be executed. Defaults to 9:00PM.
+    
+    .Parameter ComputerName
+    The name of the target computer. Defaults to localhost.
+    
+    .Parameter Name
+    Name of the scheduled task as it will appear in Task Scheduler. Defaults to 'Scheduled Restart.'
+    
+    .Parameter Description
+    Description applied to the scheduled task in Task Scheduler. Defaults to 'Scheduled after-hours restart.'
+    
+    .Example
+    Set-FutureRestart
+    
+    Schedule the local computer to restart at 9:00PM.
+    
+    .Example
+    Set-FutureRestart -ComputerName 'remote.domain.com' -RestartTime 23:50
+    
+    Schedule the remote host 'remote.domain.com' to restart at 11:50PM.
+    #>
+    param
+    (
+        [datetime]$RestartTime = '21:00',
+        [string]$Computername = $env:localhost,
+        [string]$Name = 'Scheduled Restart',
+        [string]$Description = 'Scheduled after-hours restart.'
+    )
+
+    Invoke-Command -ComputerName 'houmdtdev.dxpe.com' -Args $RestartTime,$Name,$Description -ScriptBlock{
+        $ExePath = "%windir%\System32\WindowsPowerShell\v1.0\PowerShell.exe"
+        $ActionArg = '-NoProfile -WindowStyle Hidden -Command "Restart-Computer -Force"'
+        $TaskName = $args[1]
+        $TaskDesc = $args[2]
+        $RunTime = $args[0]
+        
+        #Make sure we delete any previously scheduled restarts
+        if (Get-ScheduledTask -TaskName $TaskName -ErrorAction Ignore)
+        {
+            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+        }
+        
+        #Register this MOF to enable PowerShell task scheduling
+        mofcomp C:\Windows\System32\wbem\SchedProv.mof
+        $STAction = New-ScheduledTaskAction -Execute $ExePath -Argument $ActionArg
+        $STTrigger = New-ScheduledTaskTrigger -Once -At $RunTime
+        Register-ScheduledTask -TaskName $TaskName -Description $TaskDesc -User 'SYSTEM' -Action $STAction -Trigger $STTrigger
+    }
+}
+#endregion
+#region Get-BLStatus
+Function Get-BLStatus
+{
+    <#
+    .Synopsis
+    Monitor encryption status on remote computers.
+    
+    .Description
+    Using a remote session, get status of system drive encryption on remote computers.
+    
+    .Parameter ComputerName
+    The remote computer to target for monitoring.
+    
+    .Example
+    Get-BLStatus -ComputerName pc001.contoso.com
+    
+    Get encryption progress updates until encryption is completed.
+    #>
+    param
+    (
+        [string]$ComputerName = $env:localhost
+    )
+    
+    try
+    {
+        # Generate a session to run the remote command in
+        $BLMonSession = New-PSSession -ComputerName $ComputerName
+        
+        do
+        {
+            $Volume = (Invoke-Command -Session $BLMonSession -ScriptBlock {Get-BitLockerVolume -MountPoint $env:SystemDrive})
+            Write-Progress -Activity "Encrypting volume $($Volume.MountPoint) on $ComputerName" -Status "Encryption Progress - $($Volume.EncryptionPercentage)%" -PercentComplete $Volume.EncryptionPercentage
+            Start-Sleep -Seconds 1
+        }
+        until ($Volume.VolumeStatus -eq 'FullyEncrypted')
+    }
+    
+    # We want to kill the previously generated session when we're done
+    # no matter what happened in between
+    finally
+    {
+        Remove-PSSession -Id $($a.Id)
+    }
+}
 #endregion
