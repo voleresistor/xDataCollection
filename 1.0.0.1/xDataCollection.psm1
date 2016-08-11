@@ -1004,7 +1004,7 @@ function Set-FutureRestart
         [string]$Description = 'Scheduled after-hours restart.'
     )
 
-    Invoke-Command -ComputerName 'houmdtdev.dxpe.com' -Args $RestartTime,$Name,$Description -ScriptBlock{
+    Invoke-Command -ComputerName $Computername -Args $RestartTime,$Name,$Description -ScriptBlock{
         $ExePath = "%windir%\System32\WindowsPowerShell\v1.0\PowerShell.exe"
         $ActionArg = '-NoProfile -WindowStyle Hidden -Command "Restart-Computer -Force"'
         $TaskName = $args[1]
