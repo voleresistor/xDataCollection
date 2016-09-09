@@ -10,16 +10,22 @@
             Add Get-FolderSize
             Add PS Help comments
             Convert to module via manifest file
-        05/24/16 - v1.0.0.2
+        05/24/16
             Add Get-Password
                 Extend number of special characters supported
-        07/01/16 - v1.0.0.3
+        07/01/16
             Add Get-DFSRStats
-        07/29/16 - v1.0.0.4
+        07/29/16
             Add Set-FutureRestart
             Add Get-LocalTime
         08/04/16
             Add Get-BLStatus
+        09/01/16
+            Add Invoke-RoboCopy
+        09/08/16
+            Add Get-RandomWords
+        09/09/16
+            Add New-RandomPhrase
 #>
 
 #region Get-MemoryStats
@@ -1202,7 +1208,7 @@ function Invoke-Robocopy
         $PerFile,
         
         [Int]
-        $Retry = 5,
+        $Retry,
         
         [Switch]
         $Mirror,
@@ -1217,6 +1223,21 @@ function Invoke-Robocopy
         $Create
     )
     
+    #Define null variables
+    $DoRecurse = $null
+    $DoLogging = $null
+    $DoTee = $null
+    $DoExclude = $null
+    $DoMultithread = $null
+    $DoCopyAll = $null
+    $DoRunHour = $null
+    $DoPerFile = $null
+    $DoCreate = $null
+    $DoList = $null
+    $DoMove = $null
+    $DoMirror = $null
+    $Retry = $null
+    
     #**************************
     # Set various switches here
     
@@ -1225,19 +1246,11 @@ function Invoke-Robocopy
     {
         $DoRecurse = '/E '
     }
-    else
-    {
-        $DoRecurse = $null
-    }
     
     #Exclude old files
     if ($ExcludeOld)
     {
         $DoExclude = '/XO '
-    }
-    else
-    {
-        $DoExclude = $null
     }
     
     #Logging
@@ -1245,19 +1258,11 @@ function Invoke-Robocopy
     {
         $DoLogging = "/LOG:`"$LogLocation`" "
     }
-    else
-    {
-        $DoLogging = $null
-    }
     
     #Log Teeing
     if ($Tee)
     {
         $DoTee = '/TEE '
-    }
-    else
-    {
-        $DoTee = $null
     }
     
     #Multithreading
@@ -1265,19 +1270,11 @@ function Invoke-Robocopy
     {
         $DoMultithread = "/MT:$MultiThread "
     }
-    else
-    {
-        $DoMultithread = $null
-    }
     
     #Copy all settings
     if ($CopyAll)
     {
         $DoCopyAll = '/COPYALL '
-    }
-    else
-    {
-        $DoCopyAll = $null
     }
     
     #Run hours
@@ -1285,19 +1282,11 @@ function Invoke-Robocopy
     {
         $DoRunHour = "/RH:`"$RunHours`" "
     }
-    else
-    {
-        $DoRunHour = $null
-    }
     
     #Check run hours per file
     if ($PerFile)
     {
         $DoPerFile = '/PF '
-    }
-    else
-    {
-        $DoPerFile = $null
     }
     
     #Create
@@ -1305,19 +1294,11 @@ function Invoke-Robocopy
     {
         $DoCreate = '/CREATE '
     }
-    else
-    {
-        $DoCreate = $null
-    }
     
     #List
     if ($List)
     {
         $DoList = '/L '
-    }
-    else
-    {
-        $DoList = $null
     }
     
     #Move
@@ -1325,19 +1306,11 @@ function Invoke-Robocopy
     {
         $DoMove = '/MOVE '
     }
-    else
-    {
-        $DoMove = $null
-    }
-    
+
     #Mirror
     if ($Mirror)
     {
         $DoMirror = '/MIR '
-    }
-    else
-    {
-        $DoMirror = $null
     }
     
     #**************************
@@ -1371,4 +1344,248 @@ function Invoke-Robocopy
         explorer.exe $Destination
     }
 }
+#endregion
+#region Get-RandomWords
+function Get-RandomWords
+{
+    <#
+    .Synopsis
+    Get random words from remote APIs.
+    
+    .Description
+    Get a list of words from api.wordnik.com to create randomized usernames or passphrases.
+    
+    .Parameter Limit
+    Maximum number of results to get in one query. Default: 10
+    
+    .Parameter MinLength
+    Minimum number of characters in words. Default: 5
+    
+    .Parameter MaxLength
+    Maximum number of characters in words. Default: -1 (unlimited)
+    
+    .Parameter IncludePartOfSpeech
+    Part of speech of words to return. Default: any
+    
+    .Parameter ExcludePartOfSpeech
+    Do not include the following parts of speech in the results.
+        family-name
+        given-name
+        proper-noun
+        proper-noun-plural
+        proper-noun-posessive
+        affix
+        suffix
+        
+    .Parameter HasDictionaryDef
+    Only include words with dictionary definitions in results.
+    
+    .Parameter ApiKey
+    API key to allow the script to download results from web host.
+    
+    .Example
+    Get-RandomWords -Limit 25
+    Get 25 random nouns at least 5 characters in length.
+    
+    .Example
+    Get-RandomWords -Limit 5 -PartOfSpeech adjective -MaxLength 7 -MinLength 3
+    Get 5 random adjectives between 3 and 7 characters in length.
+    #>
+
+    param
+    (
+        [ValidateRange(5,250)]
+        [int]
+        $Limit = 10,
+        
+        [ValidateRange(1,9)]
+        [int]
+        $MinLength = 5,
+        
+        [ValidateRange(-1,10)]
+        [int]
+        $MaxLength = -1,
+        
+        [ValidateSet('verb','noun','adjective','conjunction','article','any')]
+        [string]
+        $IncludePartOfSpeech = 'any',
+        
+        [switch]
+        $ExcludePartOfSpeech,
+        
+        [switch]
+        $HasDictionaryDef,
+        
+        [string]
+        $ApiKey = 'a2a73e7b926c924fad7001ca3111acd55af2ffabf50eb4ae5'
+    )
+        
+    # Initialize an array to store our words
+    $WordList = @()
+    
+    ###### Build individual components of the URI ######
+    # Base URI
+    $baseURI = 'http://api.wordnik.com:80/v4/words.json/randomWords?'
+    
+    # Include parts of speech
+    if ($IncludePartOfSpeech -eq 'any')
+    {
+        $IncludePOS = "includePartOfSpeech="
+    }
+    else
+    {
+        $IncludePOS = "includePartOfSpeech=$IncludePartOfSpeech"
+    }
+    
+    # Exclude parts of speech
+    if ($ExcludePartOfSpeech)
+    {
+        $ExcludePOS = "excludePartOfSpeech=family-name,given-name,proper-noun,proper-noun-plural,proper-noun-posessive,affix,suffix"
+    }
+    else
+    {
+        $ExcludePOS = 'excludePartOfSpeech='
+    }
+    
+    # Max length of words
+    $MaxWordLength = "maxLength=$MaxLength"
+    
+    # Min length of words
+    $MinWordLength = "minLength=$MinLength"
+    
+    # Limit of words to return
+    $WordLimit = "limit=$Limit"
+    
+    # Has dictionary definition
+    if ($HasDictionaryDef)
+    {
+        $HasDictDef = 'hasDefinition=true'
+    }
+    else
+    {
+        $HasDictDef = 'hasDefinition=false'
+    }
+    
+    # API key
+    $API = "api_key=$ApiKey"
+    ###### End section ######
+    
+    # Build our URI and get a list of random words
+    $URI = "$baseURI$IncludePOS&$ExcludePoS&$MinWordLength&$MaxWordLength&$WordLimit&$HasDictDef&$API"
+    $Result = Invoke-WebRequest -Uri $URI
+    
+    # Convert JSON result into PS object array
+    $Result = $Result.Content | ConvertFrom-Json
+
+    # Populate $WordList with words from $Result
+    foreach ($word in $Result)
+    {
+        $WordList += $word.word
+    }
+
+    return $WordList
+}
+<#
+Example output:
+
+PS C:\> Get-RandomWords -Limit 5 -PartOfSpeech adjective -MaxLength 7 -MinLength 3
+cult
+fauvist
+punkest
+safest
+saltier
+
+#>
+#endregion
+#region New-RandomPhrase
+function New-RandomPhrase
+{
+    <#
+    .Synopsis
+    Generate random phrases from 2-5 words.
+    
+    .Description
+    Using a remote API call to wordnik.com, collect random words and use them to generate passphrases. 
+    
+    .Parameter WordPer
+    The number of words to include in each unique object. Default: 2
+    
+    .Parameter Limit
+    The number of unique objects to return. Default: 5
+    
+    .Example
+    New-RandomPhrase -WordsPer 3
+    
+    Generate 5 objects of 3 random words each.
+    #>
+    param
+    (
+        [ValidateRange(1,5)]
+        [int]
+        $WordsPer = 2,
+        
+        [ValidateRange(1,50)]
+        [int]
+        $Limit = 10
+    )
+    # An array for our results
+    $RandomResults = @()
+
+    $AnyWord = Get-RandomWords -Limit 250 -ExcludePartOfSpeech -HasDictionaryDef
+    
+    $i = 1
+    while ($i -le $Limit)
+    {
+        # Define a variable to count our word length
+        $TotalLength = 0
+        
+        # Store results as objects and count them into word length
+        $NameObj = New-Object -TypeName psobject
+        $NameObj | Add-Member -MemberType NoteProperty -Name FirstWord -Value $($AnyWord | Get-Random)
+        $TotalLength += ($NameObj.FirstWord).Length
+        $NameObj | Add-Member -MemberType NoteProperty -Name SecondWord -Value $($AnyWord | Get-Random)
+        $TotalLength += ($NameObj.SecondWord).Length
+        
+        # These properties only exist if greater than two words are requested
+        if ($WordsPer -ge 3)
+        {
+            $NameObj | Add-Member -MemberType NoteProperty -Name ThirdWord -Value $($AnyWord | Get-Random)
+            $TotalLength += ($NameObj.ThirdWord).Length
+        }
+        if ($WordsPer -ge 4)
+        {
+            $NameObj | Add-Member -MemberType NoteProperty -Name FourthWord -Value $($AnyWord | Get-Random)
+            $TotalLength += ($NameObj.FourthWord).Length
+        }
+        if ($WordsPer -ge 5)
+        {
+            $NameObj | Add-Member -MemberType NoteProperty -Name FifthWord -Value $($AnyWord | Get-Random)
+            $TotalLength += ($NameObj.FifthWord).Length
+        }
+        
+        # Add a total count as a simple measure of complexity in a potential passphrase
+        $NameObj | Add-Member -MemberType NoteProperty -Name Count -Value $TotalLength
+        
+        $RandomResults += $NameObj
+        Clear-Variable -Name NameObj,TotalLength
+        
+        $i++
+    }
+    
+    return $RandomResults
+}
+<#
+Example output:
+
+PS C:\> New-RandomPhrase -Limit 5 -WordsPer 3
+
+FirstWord       SecondWord ThirdWord    Count
+---------       ---------- ---------    -----
+grazing-ground  whisperer  tail-feather    35
+insists         mop-head   forgathering    27
+deludes         connoting  bulldogs        24
+sophomorically  toddled    crinkling       30
+xenoarchaeology throatily  boobless        32
+
+#>
 #endregion
