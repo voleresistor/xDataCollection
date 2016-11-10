@@ -26,6 +26,11 @@
             Add Get-RandomWords
         09/09/16
             Add New-RandomPhrase
+        11/10/16
+            Replace Get-Password with New-Password
+                Fix logic error resulting in predictable password patterns
+                Fix regex error excluding some special chars
+                Ensure equal chance of selecting any of the chracter types
 #>
 
 #region Get-MemoryStats
@@ -586,16 +591,16 @@ function Get-FolderSize
 #>
 #endregion
 
-#region Get-Password
-function Get-Password
+#region New-Password
+function New-Password
 {
     <#
     .Synopsis
-    Generate random passwords.
+    Generate a random password.
     
     .Description
-    Generate random passwords. Length defaults to 12 characters. Special characters, numbers, and capital
-    letters can be removed using switches.
+    Generate a random password. Length defaults to 16 characters. Special characters, numbers, and capital
+    letters can be removed using switches. Double characters are not accepted.
     
     .Parameter PasswordLength
     An integer describing the number of characters to select for the password.
@@ -607,24 +612,27 @@ function Get-Password
     Switch disabling the use of capital letters in the password.
     
     .Parameter NoNumbers
-    Switch disabling the use of numbers in the password. 
+    Switch disabling the use of numbers in the password.
+    
+    .Parameter EnableDebug
+    Switch to enable additional output about the password building process.
     
     .Example
-    Get-Password
+    New-Password
     
-    Get a 12 chracter password including at least 1 of each of the following:
+    Get a 16 chracter password including at least 1 of each of the following:
         - Numbers
         - Upper case letters
         - Lower case letters
         - Special characters
     
     .Example
-    Get-Password -NoSpecialChars
+    New-Password -NoSpecialChars
     
-    Get a 12 character password without special characters.
+    Get a 16 character password without special characters.
     
     .Example
-    Get-Password -PasswordLength 24
+    New-Password -PasswordLength 24
     
     Get a 24 chracter password including at least 1 of each of the following:
         - Numbers
@@ -634,71 +642,104 @@ function Get-Password
     #>
     param
     (
-        [int]$PasswordLength = 12,
+        [int]$PasswordLength = 16,
         [switch]$NoSpecialChars,
         [switch]$NoCaps,
-        [switch]$NoNumbers
+        [switch]$NoNumbers,
+        [switch]$EnableDebug
     )
     
-    <#
-        Define charsets and match strings
-        The method being used to choose random chars removes a char from the list when choosing it
-        so lists are tripled. This is not the most secure method of generating a password because of
-        the removal of these characters. Do not use this is true security is necessary
-    #>
-    $lowerChars = 'abcdefghijklmnopqrstuvwxyz'
-    $lowerMatch = '[a-z]{1,}'
-    $capitalChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    $capitalMatch = '[A-Z]{1,}'
-    $specialChars = '`~!@#$%^&*-+_=|:;<>,.?'
-    $specialMatch = '[`~!@#$%^&*-+_=|:;<>,.?]{1,}'
-    $numChars = '1234567890'
-    $numMatch = '[0-9]{1,}'
+    # Define charsets and match strings
+    $lowerChars = 'abcdefghijklmnopqrstuvwxyz' * 110
+    #$lowerMatch = '.*[a-z]{1,}.*'
+    $capitalChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' * 110
+    $capitalMatch = '.*[A-Z]{1,}.*'
+    $specialChars = '`~!@#$%^&*-+_=|:;<>,.?' * 130
+    $specialMatch = '.*[`~!@#$%^&*\-+_=|:;<>,.?]{1,}.*'
+    $numChars = '1234567890' * 286
+    $numMatch = '.*[0-9]{1,}.*'
     
     $pwdChars = $lowerChars
-    $matchString = ".*$lowerMatch"
     
-    # Create list of potential password chars and match strings
+    # Store password
+    $passwdString = $null
+    
+    # Create list of potential password chars
     if (!($NoCaps))
     {
         $pwdChars += $capitalChars
-        $matchString += ".*$capitalMatch"
     }
     
     if (!($NoSpecialChars))
     {
         $pwdChars += $specialChars
-        $matchString += ".*$specialMatch"
     }
     
     if (!($NoNumbers))
     {
         $pwdChars += $numChars
-        $matchString += ".*$numMatch"
     }
     
-    $matchString += '.*'
+    $pwdChars = ($pwdChars.ToCharArray())
     
     # Create and check new passwords until match is valid
-    while ($true)
+    while ($validPassword -ne $true)
     {
-        $passwdString = -join ($pwdChars.ToCharArray() * 100 | Get-Random -Count $PasswordLength)
-        
-        if ($passwdString -match $matchString)
+        # Initialize some variables for program use
+        $nextChar = $null
+        $lastChar = $null
+        $validPassword = $true
+    
+        while ($passwdString.Length -lt $PasswordLength)
         {
-            return $passwdString
+            $lastChar = $nextChar
+            $nextChar = Get-Random -InputObject $pwdChars
+
+            if ($nextChar -ne $lastChar)
+            {
+                $passwdString += $nextChar
+            }
+            
+            if ($EnableDebug)
+            {
+                Write-Host "Last Char: $lastChar"
+                Write-Host "Next Char: $nextChar"
+                Write-Host "Current Pwd String: $passwdString`r`n"
+                Write-Host "Pword String Length: $($passwdString.Length)"
+            }
+        }
+        
+        # Check that at least one capital letter exists if necessary
+        if (!($NoCaps) -and !($passwdString -cmatch $capitalMatch))
+        {
+            $validPassword = $false
+        }
+        
+        # Check that at least one number exists if necessary
+        if (!($NoNumbers) -and !($passwdString -match $numMatch))
+        {
+            $validPassword = $false
+        }
+        
+        # Check that at least one special character exists if necessary
+        if (!($NoSpecialChars) -and !($passwdString -match $specialMatch))
+        {
+            $validPassword = $false
         }
     }
+    
+    return $passwdString
 }
 <#
 Expected output:
 
-    PS C:\temp> Get-Password
-    71s*Q#j3c2#G
-    PS C:\temp> Get-Password -NoSpecialChars
-    cYGjDJ6IhusZ
-    PS C:\temp> Get-Password -PasswordLength 20
-    TSJCBldFs4Rurs8!9RmN
+    PS C:\temp> New-Password
+    27j>:9$2%18t!w^F
+    PS C:\temp> New-Password -NoSpecialChars
+    32ondK8E2W0VtLg4
+    PS C:\temp> New-Password -PasswordLength 20
+    i3X%,C,S<d+LjQWXDK9k
+    
 #>
 #endregion
 
