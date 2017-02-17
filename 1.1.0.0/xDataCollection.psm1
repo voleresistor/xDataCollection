@@ -41,6 +41,10 @@
                 Add ability to handle array of names
             Update Get-DfsrStats
                 Fix error that caused no data to be returned
+
+        02/17/17
+            Modify Get-InstalledSoftware
+                Add ProductName and ProductGUID
 #>
 
 #region Get-MemoryStats
@@ -371,6 +375,12 @@ function Get-InstalledSoftware
     
     .Parameter IncludeUpdates
     A switch which enables inclusion of removable software updates in the list of software.
+
+    .Parameter ProductName
+    Name of product to search for.
+
+    .Parameter ProductGuid
+    GUID to search for.
     
     .Example
     Get-InstalledSoftware
@@ -395,10 +405,14 @@ function Get-InstalledSoftware
         )]
         [string[]]$ComputerName = $env:computername,
 
-        [parameter(
-            Mandatory=$false
-        )]
-        [switch]$IncludeUpdates
+        [parameter(Mandatory=$false)]
+        [switch]$IncludeUpdates,
+
+        [parameter(Mandatory=$false)]
+        [string]$ProductName,
+
+        [parameter(Mandatory=$false)]
+        [string]$ProductGUID
     )
            
     begin
@@ -414,6 +428,7 @@ function Get-InstalledSoftware
                 
     process
     {
+        #Cycle through list of computers
         foreach($Computer in $ComputerName)
         {
             if(!(Test-Connection -ComputerName $Computer -Count 1 -ea 0))
@@ -421,12 +436,13 @@ function Get-InstalledSoftware
                 continue
             }
             
+            #Gather data based on each reg key
             foreach($UninstallRegKey in $UninstallRegKeys)
             {
                 try
                 {
-                    $HKLM   = [microsoft.win32.registrykey]::OpenRemoteBaseKey('LocalMachine',$computer)
-                    $UninstallRef  = $HKLM.OpenSubKey($UninstallRegKey)
+                    $HKLM = [microsoft.win32.registrykey]::OpenRemoteBaseKey('LocalMachine',$Computer)
+                    $UninstallRef = $HKLM.OpenSubKey($UninstallRegKey)
                     $Applications = $UninstallRef.GetSubKeyNames()
                 }
                 catch
@@ -435,58 +451,88 @@ function Get-InstalledSoftware
                     Continue
                 }
                 
+                #Populate app data
                 foreach ($App in $Applications)
                 {
-                    $AppRegistryKey             = $UninstallRegKey + "\\" + $App
-                    $AppDetails                 = $HKLM.OpenSubKey($AppRegistryKey)
-                    $AppUninstall               = $($AppDetails.GetValue("UninstallString"))
+                    $AppRegistryKey = $UninstallRegKey + "\\" + $App
+                    $AppDetails = $HKLM.OpenSubKey($AppRegistryKey)
 
-                    if ($AppUninstall -match "msiexec(.exe){0,1} \/[XIxi]{1}\{.*")
-                    {
-                        $AppGUID                = $AppUninstall -replace "msiexec(.exe){0,1} \/[XIxi]{1}\{","{"
-                    }
-                    else
-                    {
-                        $AppGUID                = ''
-                    }
-                    
-                    $AppDisplayName             = $($AppDetails.GetValue("DisplayName"))
-                    $AppVersion                 = $($AppDetails.GetValue("DisplayVersion"))
-                    $AppPublisher               = $($AppDetails.GetValue("Publisher"))
-                    $AppInstalledDate           = $($AppDetails.GetValue("InstallDate"))
-
-                    if($UninstallRegKey -match "Wow6432Node")
-                    {
-                        $Softwarearchitecture   = "x86"
-                    }
-                    else
-                    {
-                        $Softwarearchitecture   = "x64"
-                    }            
-                    
-                    if((!$AppDisplayName) -or (($AppDisplayName -match ".*KB[0-9]{7}.*") -and (!$IncludeUpdates)))
+                    #Skip this object if there's no display name or it's an update and we aren't including them
+                    if((!$($AppDetails.GetValue("DisplayName"))) -or (($($AppDetails.GetValue("DisplayName")) -match ".*KB[0-9]{7}.*") -and (!$IncludeUpdates)))
                     {
                         continue
                     }
-                    
+
+                    #Match ProductName if provided
+                    if ($ProductName -and !($($AppDetails.GetValue("DisplayName")) -match $ProductName))
+                    {
+                        continue
+                    }
+
+                    #Match ProductGUID if provided
+                    if ($ProductGUID -and !($($AppDetails.GetValue("UninstallString")) -match $ProductGUID))
+                    {
+                        continue
+                    }
+
+                    #Create the object
                     $OutputObj = New-Object -TypeName PSobject
                     $OutputObj | Add-Member -MemberType NoteProperty -Name ComputerName -Value $Computer.ToUpper()
-                    $OutputObj | Add-Member -MemberType NoteProperty -Name AppName -Value $AppDisplayName
-                    $OutputObj | Add-Member -MemberType NoteProperty -Name AppVersion -Value $AppVersion
-                    $OutputObj | Add-Member -MemberType NoteProperty -Name AppVendor -Value $AppPublisher
-                    $OutputObj | Add-Member -MemberType NoteProperty -Name InstalledDate -Value $AppInstalledDate
-                    $OutputObj | Add-Member -MemberType NoteProperty -Name UninstallKey -Value $AppUninstall
-                    $OutputObj | Add-Member -MemberType NoteProperty -Name AppGUID -Value $AppGUID
-                    $OutputObj | Add-Member -MemberType NoteProperty -Name SoftwareArchitecture -Value $Softwarearchitecture
+
+                    #Begin populating the object
+                    #Start by gathering the easy data
+                    $OutputObj | Add-Member -MemberType NoteProperty -Name UninstallKey -Value $($AppDetails.GetValue("UninstallString"))
+                    $OutputObj | Add-Member -MemberType NoteProperty -Name AppName -Value $($AppDetails.GetValue("DisplayName"))
+                    $OutputObj | Add-Member -MemberType NoteProperty -Name AppVersion -Value $($AppDetails.GetValue("DisplayVersion"))
+                    $OutputObj | Add-Member -MemberType NoteProperty -Name AppVendor -Value $($AppDetails.GetValue("Publisher"))
+
+                    #Extract the GUID from the MSI uninstall key
+                    if ($($AppDetails.GetValue("UninstallString")) -match "msiexec(.exe){0,1} \/[XIxi]{1}\{.*")
+                    {
+                        $OutputObj | Add-Member -MemberType NoteProperty -Name AppGUID -Value $($($AppDetails.GetValue("UninstallString")) -replace "msiexec(.exe){0,1} \/[XIxi]{1}\{","{")
+                    }
+                    else
+                    {
+                        $OutputObj | Add-Member -MemberType NoteProperty -Name AppGUID -Value ''
+                    }
+
+                    #Build a human readable date string
+                    $RawDate = $AppDetails.GetValue("InstallDate")
+
+                    if ($RawDate)
+                    {
+                        $RawYear = ($RawDate -split "[0-9]{4}$")[0]
+                        $RawDM = ($RawDate -split "^[0-9]{4}")[1]
+                        $RawMonth = ($RawDM -split "[0-9]{2}$")[0]
+                        $RawDay = ($RawDM -split "^[0-9]{2}")[1]
+                    
+                        [datetime]$FormattedDate = "$RawMonth/$RawDay/$RawYear"
+                        $OutputObj | Add-Member -MemberType NoteProperty -Name InstalledDate -Value $($FormattedDate.ToShortDateString())
+                    }
+                    else
+                    {
+                        $OutputObj | Add-Member -MemberType NoteProperty -Name InstalledDate -Value ''
+                    }
+
+                    #Determine if app is 64/32 bit. This assumes that all clients are 64 bit
+                    if($UninstallRegKey -match "Wow6432Node")
+                    {
+                        $OutputObj | Add-Member -MemberType NoteProperty -Name SoftwareArchitecture -Value 'x86'
+                    }
+                    else
+                    {
+                        $OutputObj | Add-Member -MemberType NoteProperty -Name SoftwareArchitecture -Value 'x64'
+                    }
 
                     $AllMembers += $OutputObj
-                }
-            }   
+                }   
+            }
         }
     }
-
+                
     end
     {
+        #Return the data we discovered
         return $AllMembers
     }
 }
@@ -1254,6 +1300,7 @@ function Set-FutureRestart
     }
 }
 #endregion
+
 #region Get-BLStatus
 Function Get-BLStatus
 {
