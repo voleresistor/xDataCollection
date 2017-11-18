@@ -1,0 +1,50 @@
+xDataCollection.psm1 Change Log
+
+Changelog:
+        04/25/16 - v1.0.0.1
+            Add Get-InstalledSoftware
+            Add Get-FolderSize
+            Add PS Help comments
+            Convert to module via manifest file
+        05/24/16
+            Add Get-Password
+                Extend number of special characters supported
+        07/01/16
+            Add Get-DFSRStats
+        07/29/16
+            Add Set-FutureRestart
+            Add Get-LocalTime
+        08/04/16
+            Add Get-BLStatus
+        09/01/16
+            Add Invoke-RoboCopy
+        09/08/16
+            Add Get-RandomWords
+        09/09/16
+            Add New-RandomPhrase
+        11/10/16
+            Replace Get-Password with New-Password
+                Fix logic error resulting in predictable password patterns
+                Fix regex error excluding some special chars
+                Ensure equal chance of selecting any of the chracter types
+        11/17/16 - v1.1.0.0
+            Add Start-CountDown
+            Modify formatting in Get-MemoryStats
+                Change memory unit to GB
+                Make all numerical output 2 decimal place floats
+            Modify Get-DiskSize
+                Add capability to take input from pipeline
+                Add ability to handle array of names
+            Update Get-DfsrStats
+                Fix error that caused no data to be returned
+
+        02/17/17
+            Modify Get-InstalledSoftware
+                Add ProductName and ProductGUID
+        
+        11/18/17
+            V 1.2.0.0
+            Move ChangeLog to separate folder
+            Fix spacing between function regions
+                Remove extra #endregion tag
+            
