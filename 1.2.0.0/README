@@ -1,4 +1,11 @@
-xDataCollection.psm1 Change Log
+xDataCollection.psm1
+
+Description:
+    A collection of random PowerShell functions to aid in common data collection tasks. A basic script type module is provided by a psd1 file.
+
+Installation:
+    Copy xDataCollection folder to C:\Users\<user>\Documents\WindowsPowerShell\Modules and restart any PS windows.
+
 
 Changelog:
         04/25/16 - v1.0.0.1
@@ -47,4 +54,6 @@ Changelog:
             Move ChangeLog to separate folder
             Fix spacing between function regions
                 Remove extra #endregion tag
+        11/19/17
+            Rename Changelog file to README
             
