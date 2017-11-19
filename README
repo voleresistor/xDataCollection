@@ -49,8 +49,7 @@ Changelog:
             Modify Get-InstalledSoftware
                 Add ProductName and ProductGUID
         
-        11/18/17
-            V 1.2.0.0
+        11/18/17 - v1.2.0.0
             Move ChangeLog to separate folder
             Fix spacing between function regions
                 Remove extra #endregion tag
