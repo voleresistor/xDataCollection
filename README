@@ -4,7 +4,7 @@ Description:
     A collection of random PowerShell functions to aid in common data collection tasks. A basic script type module is provided by a psd1 file.
 
 Installation:
-    Copy xDataCollection folder to C:\Users\<user>\Documents\WindowsPowerShell\Modules and restart any PS windows.
+    Copy xDataCollection folder to C:\Users\<user>\Documents\WindowsPowerShell\Modules and restart any PS terminals.
 
 
 Changelog:
