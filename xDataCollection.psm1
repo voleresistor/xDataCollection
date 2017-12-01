@@ -17,7 +17,7 @@
         Get-DiskSize
         Get-DFSRStats
         Get-LocalTime
-        Set-FutureRestart
+        New-RestartTask
         Get-BLStatus
         Get-RandomWords
         New-RandomPhrase

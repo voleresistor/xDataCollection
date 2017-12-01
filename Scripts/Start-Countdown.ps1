@@ -23,6 +23,9 @@ Function Start-CountDown
     
     .Parameter WaitUntil
     Time in DateTime format to end countdown. This is exclusive with other $Wait<time> parameters.
+
+    .PARAMETER ShowNotification
+    Pop up a small notice window to inform the user that the countdown has completed.
     
     .Example
     Start-CountDown -ActivityName 'Wait for task completion' -WaitSeconds 15
@@ -55,7 +58,10 @@ Function Start-CountDown
         [int]$WaitHours,
         
         [Parameter(Mandatory=$false,ParameterSetName='WaitUntil')]
-        [datetime]$WaitUntil
+        [datetime]$WaitUntil,
+
+        [Parameter(Mandatory=$false)]
+        [switch]$ShowNotification
     )
     
     try
@@ -104,7 +110,25 @@ Function Start-CountDown
     }
     finally
     {
-        
+        if ($ShowNotification)
+        {
+            #Create Default Document Form
+            Add-Type -AssemblyName System.Windows.Forms
+            $msgForm = New-Object Windows.Forms.Form
+            $msgForm.Size = New-Object Drawing.Size @(400,200)
+            $msgForm.StartPosition = "CenterScreen"
+            $msgForm.Text = $ActivityName
+
+            #Write Message on msgForm Box
+            $msgLabel = New-Object System.Windows.Forms.Label
+            $msgLabel.Location = New-Object System.Drawing.Size(0,0)
+            $msgLabel.Size = New-Object System.Drawing.Size(400,200)
+            $msgLabel.Text = "Completed at $(Get-Date)"
+            $msgForm.Controls.Add($msgLabel)
+
+            #Display msgForm
+            $msgForm.ShowDialog()
+        }
     }
 }
 #endregion
