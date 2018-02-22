@@ -23,7 +23,7 @@
         New-RandomPhrase
         Start-CountDown
         Get-ReplStatus
-
+        New-WaitSpan
 #>
 
 foreach ($Script in Get-ChildItem -Path "$PSScriptRoot\Scripts" -Filter *.ps1)
