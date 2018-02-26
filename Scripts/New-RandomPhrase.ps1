@@ -9,10 +9,10 @@ function New-RandomPhrase
     Using a remote API call to wordnik.com, collect random words and use them to generate passphrases. 
     
     .Parameter WordPer
-    The number of words to include in each unique object. Default: 2
+    The number of words to include in each unique object. Default: 3
     
     .Parameter Limit
-    The number of unique objects to return. Default: 5
+    The number of unique objects to return. Default: 10
     
     .Example
     New-RandomPhrase -WordsPer 3
@@ -21,9 +21,9 @@ function New-RandomPhrase
     #>
     param
     (
-        [ValidateRange(1,5)]
+        [ValidateRange(2,4)]
         [int]
-        $WordsPer = 2,
+        $WordsPer = 3,
         
         [ValidateRange(1,50)]
         [int]
@@ -32,43 +32,66 @@ function New-RandomPhrase
     # An array for our results
     $RandomResults = @()
 
-    $AnyWord = Get-RandomWords -Limit 250 -ExcludePartOfSpeech -HasDictionaryDef
+    $Adjectives = Get-RandomWords -Limit ($Limit*5) -IncludePartOfSpeech adjective -HasDictionaryDef true
+    $Nouns = Get-RandomWords -Limit ($Limit*5) -IncludePartOfSpeech noun -HasDictionaryDef true
+
+    if ($WordsPer -ge 3)
+    {
+        $Verbs = Get-RandomWords -Limit ($Limit*5) -IncludePartOfSpeech verb -HasDictionaryDef true
+    }
+
+    if ($WordsPer -eq 4)
+    {
+        $Adverbs = Get-RandomWords -Limit ($Limit*5) -IncludePartOfSpeech adverb -HasDictionaryDef true
+    }
     
     $i = 1
     while ($i -le $Limit)
     {
-        # Define a variable to count our word length
-        $TotalLength = 0
-        
-        # Store results as objects and count them into word length
+        # New object
         $NameObj = New-Object -TypeName psobject
-        $NameObj | Add-Member -MemberType NoteProperty -Name FirstWord -Value $($AnyWord | Get-Random)
-        $TotalLength += ($NameObj.FirstWord).Length
-        $NameObj | Add-Member -MemberType NoteProperty -Name SecondWord -Value $($AnyWord | Get-Random)
-        $TotalLength += ($NameObj.SecondWord).Length
-        
-        # These properties only exist if greater than two words are requested
+
+        # Count phrase length
+        $PhraseLength = 0
+
+        # (adverb) (verb) adjective noun
+        $CurrentAdj = $Adjectives | Get-Random
+        $CurrentNoun = $Nouns | Get-Random
+
+        if ($WordsPer -eq 4)
+        {
+            $CurrentAdverb = $Adverbs | Get-Random
+            $NameObj | Add-Member -MemberType NoteProperty -Name Adverb -Value $CurrentAdverb
+            $PhraseLength += $CurrentAdverb.Length
+
+            # Remove from list
+            $Adverbs = $Adverbs -ne $CurrentAdverb
+        }
+
         if ($WordsPer -ge 3)
         {
-            $NameObj | Add-Member -MemberType NoteProperty -Name ThirdWord -Value $($AnyWord | Get-Random)
-            $TotalLength += ($NameObj.ThirdWord).Length
+            $CurrentVerb = $Verbs | Get-Random
+            $NameObj | Add-Member -MemberType NoteProperty -Name Verb -Value $CurrentVerb
+            $PhraseLength += $CurrentVerb.Length
+
+            # Remove from list
+            $Verbs = $Verbs -ne $CurrentVerb
         }
-        if ($WordsPer -ge 4)
-        {
-            $NameObj | Add-Member -MemberType NoteProperty -Name FourthWord -Value $($AnyWord | Get-Random)
-            $TotalLength += ($NameObj.FourthWord).Length
-        }
-        if ($WordsPer -ge 5)
-        {
-            $NameObj | Add-Member -MemberType NoteProperty -Name FifthWord -Value $($AnyWord | Get-Random)
-            $TotalLength += ($NameObj.FifthWord).Length
-        }
-        
+
+        $NameObj | Add-Member -MemberType NoteProperty -Name Adjective -Value $CurrentAdj
+        $PhraseLength += $CurrentAdj.Length
+
+        $NameObj | Add-Member -MemberType NoteProperty -Name Noun -Value $CurrentNoun
+        $PhraseLength += $CurrentNoun.Length
+
+        $Adjectives = $Adjectives -ne $CurrentAdj
+        $Nouns = $Nouns -ne $CurrentNoun
+
         # Add a total count as a simple measure of complexity in a potential passphrase
-        $NameObj | Add-Member -MemberType NoteProperty -Name Count -Value $TotalLength
+        $NameObj | Add-Member -MemberType NoteProperty -Name Length -Value $PhraseLength
         
         $RandomResults += $NameObj
-        Clear-Variable -Name NameObj,TotalLength
+        Clear-Variable -Name NameObj
         
         $i++
     }

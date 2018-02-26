@@ -59,18 +59,22 @@ function Get-RandomWords
         [int]
         $MaxLength = -1,
         
-        [ValidateSet('verb','noun','adjective','conjunction','article','any')]
+        [ValidateSet('verb','noun','adjective','conjunction','article','any','adverb')]
         [string]
-        $IncludePartOfSpeech = 'any',
+        $IncludePartOfSpeech,
         
-        [switch]
+        [ValidateSet('verb','noun','adjective','conjunction','article','any','family-name','given-name',
+            'proper-noun','proper-noun-plural','proper-noun-posessive','affix','suffix')]
+        [string]
         $ExcludePartOfSpeech,
         
-        [switch]
+        [ValidateSet('true','false')]
+        [string]
         $HasDictionaryDef,
         
         [string]
-        $ApiKey = 'a2a73e7b926c924fad7001ca3111acd55af2ffabf50eb4ae5'
+        #$ApiKey = 'a2a73e7b926c924fad7001ca3111acd55af2ffabf50eb4ae5'
+        $ApiKey = '358d7a788c021dac1f00506abf10bac9de42e9b78704a8556'
     )
         
     # Initialize an array to store our words
@@ -81,11 +85,7 @@ function Get-RandomWords
     $baseURI = 'http://api.wordnik.com:80/v4/words.json/randomWords?'
     
     # Include parts of speech
-    if ($IncludePartOfSpeech -eq 'any')
-    {
-        $IncludePOS = "includePartOfSpeech="
-    }
-    else
+    if ($IncludePartOfSpeech)
     {
         $IncludePOS = "includePartOfSpeech=$IncludePartOfSpeech"
     }
@@ -93,38 +93,27 @@ function Get-RandomWords
     # Exclude parts of speech
     if ($ExcludePartOfSpeech)
     {
-        $ExcludePOS = "excludePartOfSpeech=family-name,given-name,proper-noun,proper-noun-plural,proper-noun-posessive,affix,suffix"
-    }
-    else
-    {
-        $ExcludePOS = 'excludePartOfSpeech='
+        $ExcludePOS = "&excludePartOfSpeech=$ExcludePartOfSpeech"
     }
     
     # Max length of words
-    $MaxWordLength = "maxLength=$MaxLength"
+    $MaxWordLength = "&maxLength=$MaxLength"
     
     # Min length of words
-    $MinWordLength = "minLength=$MinLength"
+    $MinWordLength = "&minLength=$MinLength"
     
     # Limit of words to return
-    $WordLimit = "limit=$Limit"
+    $WordLimit = "&limit=$Limit"
     
     # Has dictionary definition
-    if ($HasDictionaryDef)
-    {
-        $HasDictDef = 'hasDefinition=true'
-    }
-    else
-    {
-        $HasDictDef = 'hasDefinition=false'
-    }
+    $HasDictDef = "&hasDefinition=$HasDictionaryDef"
     
     # API key
-    $API = "api_key=$ApiKey"
+    $API = "&api_key=$ApiKey"
     ###### End section ######
     
     # Build our URI and get a list of random words
-    $URI = "$baseURI$IncludePOS&$ExcludePoS&$MinWordLength&$MaxWordLength&$WordLimit&$HasDictDef&$API"
+    $URI = $baseURI + $IncludePOS + $ExcludePoS + $MinWordLength + $MaxWordLength + $WordLimit + $HasDictDef + $API
     $Result = Invoke-WebRequest -Uri $URI
     
     # Convert JSON result into PS object array
