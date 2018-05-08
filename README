@@ -65,4 +65,7 @@ Changelog:
                 
         11/19/17
             Rename Changelog file to README
+
+		05/08/18
+			Add Get-FileLength
             
