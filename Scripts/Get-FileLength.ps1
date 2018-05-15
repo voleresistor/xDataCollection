@@ -37,6 +37,8 @@ function Get-FileLength
     )
 
     # Convert length in bytes to human readable numbers
+
+    #region ConvertLength
     function ConvertLength
     {
         param
@@ -67,6 +69,7 @@ function Get-FileLength
 
         return "$size $unit"
     }
+    #endregion
 
     # Save file lengths here
     [int]$i = 0

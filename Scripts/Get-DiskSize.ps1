@@ -22,59 +22,117 @@ function Get-DiskSize
             ValueFromPipeline=$true,
             ValueFromPipelineByPropertyName=$true
         )]
-        [string[]]$ComputerName = $env:computername
+        [string[]]$ComputerName = $env:computername,
+
+        [Parameter(Mandatory=$false)]
+        [string]$DriveLetter
     )
-    
-    begin
+
+    #region ConvertLength
+    function ConvertLength
     {
-        # Create an array to hold our objects
-        $AllMembers = @()
-    }
-    
-    process
-    {
-        foreach ($Computer in $ComputerName)
+        param
+        (
+            [System.Int64]$Length
+        )
+
+        if ($Length -lt 1048576)
         {
-            $Disks = Get-WmiObject -Class Win32_Volume -ComputerName $ComputerName | Where-Object {$_.DriveType -eq 3}
-            
-            foreach ($disk in $Disks)
+            $size = "{0:N2}" -f $($Length / 1kb)
+            $unit = 'KB'
+        }
+        elseif ($Length -lt 1073741824)
+        {
+            $size = "{0:N2}" -f $($Length / 1mb)
+            $unit = 'MB'
+        }
+        elseif ($Length -lt 1099511627776)
+        {
+            $size = "{0:N2}" -f $($Length / 1gb)
+            $unit = 'GB'
+        }
+        else
+        {
+            $size = "{0:N2}" -f $($Length / 1tb)
+            $unit = 'TB'
+        }
+
+        return "$size $unit"
+    }
+    #endregion
+    
+    # Create an array to hold our objects
+    $AllMembers = @()
+    $count = $ComputerName.Count
+    
+    foreach ($Computer in $ComputerName)
+    {
+        $idx = [array]::IndexOf($ComputerName, $Computer) + 1
+        Write-Progress -Activity 'Getting disk info...' -Status $Computer -PercentComplete (($idx / $count) * 100)
+
+        if ($DriveLetter)
+        {
+            $Disks = Get-WmiObject -Class Win32_Volume -ComputerName $Computer -ErrorAction SilentlyContinue |
+                Where-Object {$_.DriveLetter -eq $DriveLetter + ":"}
+        }
+        else
+        {
+            $Disks = Get-WmiObject -Class Win32_Volume -ComputerName $Computer -ErrorAction SilentlyContinue |
+                Where-Object {$_.DriveType -eq 3}
+        }
+
+        foreach ($disk in $Disks)
+        {
+            <#if (($disk.Label -eq 'System Reserved') -or ($disk.Label -eq 'RECOVERY') -or ($disk.Label -eq 'SYSTEM'))
             {
-                if ($disk.Label -eq 'System Reserved')
-                {
-                    continue
-                }
-                
-                $FreeSpace = "{0:N2}" -f ($disk.FreeSpace / 1gb)
-                $TotalSize = "{0:N2}" -f ($disk.Capacity / 1gb)
-                $UsedSpace = "{0:N2}" -f ($TotalSize - $FreeSpace)
-                $DiskLabel = $($disk.Label)
-                $DiskLetter = $($disk.DriveLetter)
-                
-                # Create and populate an object for each disk
-                $DiskObj = New-Object -TypeName PSObject
-                $DiskObj | Add-Member -MemberType NoteProperty -Name ComputerName -Value $Computer
-                $DiskObj | Add-Member -MemberType NoteProperty -Name DiskLabel -Value $DiskLabel
-                $DiskObj | Add-Member -MemberType NoteProperty -Name FreeSpaceGB -Value $FreeSpace
-                $DiskObj | Add-Member -MemberType NoteProperty -Name UsedSpaceGB -Value $UsedSpace
-                $DiskObj | Add-Member -MemberType NoteProperty -Name TotalSizeGB -Value $TotalSize
-                $DiskObj | Add-Member -MemberType NoteProperty -Name DriveLetter -Value $DiskLetter
-                
-                # Add object to collection array
-                $AllMembers += $DiskObj
-                
-                # Cleanup
-                Clear-Variable FreeSpace,TotalSize,UsedSpace,DiskLabel,DiskLetter,DiskObj
-            }
+                continue
+            }#>
+            
+            $FreeSpace = ConvertLength -Length $disk.FreeSpace
+            $TotalSize = ConvertLength -Length $disk.Capacity
+            $UsedSpace = ConvertLength -Length ($($disk.Capacity) - $($disk.FreeSpace))
+            $DiskLabel = $($disk.Label)
+            $DiskLetter = $($disk.DriveLetter)
+            
+            # Create and populate an object for each disk
+            $DiskObj = New-Object -TypeName PSObject
+            $DiskObj | Add-Member -MemberType NoteProperty -Name ComputerName -Value $Computer
+            $DiskObj | Add-Member -MemberType NoteProperty -Name DiskLabel -Value $DiskLabel
+            $DiskObj | Add-Member -MemberType NoteProperty -Name FreeSpace -Value $FreeSpace
+            $DiskObj | Add-Member -MemberType NoteProperty -Name UsedSpace -Value $UsedSpace
+            $DiskObj | Add-Member -MemberType NoteProperty -Name TotalSize -Value $TotalSize
+            $DiskObj | Add-Member -MemberType NoteProperty -Name DriveLetter -Value $DiskLetter
+            
+            # Add object to collection array
+            $AllMembers += $DiskObj
             
             # Cleanup
+            $allThoseVars = @(
+                'FreeSpace',
+                'TotalSize',
+                'UsedSpace',
+                'DiskLabel',
+                'DiskLetter',
+                'DiskObj'
+            )
+
+            foreach ($v in $allThoseVars)
+            {
+                if (Get-Variable -Name $v -ErrorAction SilentlyContinue)
+                {
+                    Clear-Variable -Name $v
+                }
+            }
+        }
+        
+        # Cleanup
+        if (Get-Variable -Name 'Disks' -ErrorAction SilentlyContinue)
+        {
             Clear-Variable Disks
         }
     }
     
-    end
-    {
-        return $AllMembers
-    }
+    return $AllMembers
 }
 <#
     PS C:\> Get-DiskSize | ft
