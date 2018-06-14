@@ -72,7 +72,7 @@ function Get-FileLength
     #endregion
 
     # Save file lengths here
-    [int]$i = 0
+    [bigint]$i = 0
 
     # Save custom objects here
     $Results = @()
