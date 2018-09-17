@@ -27,6 +27,8 @@ function Get-FolderSize
     
     Get total size of all files within each folder returned by (ls c:\ -Attributes D)
     #>
+
+    [CmdletBinding()]
     param
     (
         [parameter(
@@ -50,12 +52,13 @@ function Get-FolderSize
         foreach ($folder in $Path)
         {
             # Get every file in the target path
-            ForEach ($file in (Get-ChildItem $folder -Recurse -Attributes !D))
+            ForEach ($file in (Get-ChildItem $folder -Recurse -File))
             {
                 # Use measure object to get the byte size of each file and add
                 # it to $totalSize
-                $fileSize = Measure-Object -InputObject $file -Property length -Sum
-                $totalSize += $fileSize.sum
+                #$fileSize = Measure-Object -InputObject $file -Property length -Sum
+                Write-Verbose $($file.FullName)
+                $totalSize += $($file.Length)
             }
         }
         
