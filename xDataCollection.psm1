@@ -6,24 +6,26 @@
     Updated 12/01/17
 
     Included functions:
-        Get-MemoryStats
-        Get-OSVersion
-        Get-Uptime
-        Get-InstalledSoftware
-        Get-FolderSize
-        Get-InstalledSoftware
-        New-Password
-        Get-OldFiles
-        Get-DiskSize
-        Get-DFSRStats
-        Get-LocalTime
-        New-RestartTask
-        Get-BLStatus
-        Get-RandomWords
-        New-RandomPhrase
-        Start-CountDown
-        Get-ReplStatus
-        New-WaitSpan
+        'Get-MemoryStats',
+        'Get-OSVersion',
+        'Get-Uptime',
+        'Get-InstalledSoftware',
+        'Get-FolderSize',
+        'Get-InstalledSoftware',
+        'New-Password',
+        'Get-OldFiles',
+        'Get-DiskSize',
+        'Get-DFSRStats',
+        'Get-LocalTime',
+        'New-RestartTask',
+        'Get-BLStatus',
+        'Get-RandomWords',
+        'New-RandomPhrase',
+        'Start-CountDown',
+        'Get-ReplStatus',
+        'New-WaitSpan',
+        'Get-FileLength',
+        'Get-FoldersWithoutInheritance'
 #>
 
 foreach ($Script in Get-ChildItem -Path "$PSScriptRoot\Scripts" -Filter *.ps1)
