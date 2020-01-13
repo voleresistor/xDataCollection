@@ -44,7 +44,7 @@ Function Get-MemoryStats
         foreach ($target in $ComputerName)
         {
             # Get relevant memory info from WMI on the target computer
-            $MemorySpecs = Get-WmiObject -Class Win32_Operatingsystem -ComputerName $target -ErrorAction SilentlyContinue | Select-Object FreePhysicalMemory,TotalVisibleMemorySize
+            $MemorySpecs = Get-CimInstance -ClassName Win32_Operatingsystem -ComputerName $target -ErrorAction SilentlyContinue | Select-Object FreePhysicalMemory,TotalVisibleMemorySize
                 
             # Check that we got a result from the WMI query and skip this computer if not
             #if (! $MemorySpecs)
@@ -94,6 +94,11 @@ Function Get-MemoryStats
         Return $AllMembers
     }
 }
+<#
+    CHANGELOG
+    01/06/2020
+        Replace Get-WmiObject with Get-CimInstance
+#>
 <#    
     Example Output:
     

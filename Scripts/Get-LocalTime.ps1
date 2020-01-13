@@ -1,5 +1,5 @@
 #region Get-LocalTime
-Function Get-LocalTime($UTCTime)
+Function Get-LocalTime()
 {
     <#
     .Synopsis
@@ -16,11 +16,23 @@ Function Get-LocalTime($UTCTime)
     
     Get UTC time converted to local time.
     #>
-    $strCurrentTimeZone = (Get-WmiObject win32_timezone).StandardName
+
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [datetime]$SourceTime
+    )
+
+    $strCurrentTimeZone = (Get-CimInstance -ClassName win32_timezone).StandardName
     $TZ = [System.TimeZoneInfo]::FindSystemTimeZoneById($strCurrentTimeZone)
-    $LocalTime = [System.TimeZoneInfo]::ConvertTimeFromUtc($UTCTime, $TZ)
+    $LocalTime = [System.TimeZoneInfo]::ConvertTimeFromUtc($SourceTime, $TZ)
     Return $LocalTime
 }
+<#
+    CHANGELOG
+    01/06/2020
+        Replace Get-WmiObject with Get-CimInstance
+#>
 <#
     PS C:\> Get-LocalTime -UTCTime "21:00 07/30/16"
     

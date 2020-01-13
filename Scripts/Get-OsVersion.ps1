@@ -49,7 +49,7 @@ Function Get-OSVersion
             }
             
             # Get relevant memory info from WMI on the target computer
-            $OSSpecs = Get-WmiObject -Class Win32_Operatingsystem -ComputerName $target |
+            $OSSpecs = Get-CimInstance -ClassName Win32_Operatingsystem -ComputerName $target |
                 Select-Object WindowsDirectory,OSArchitecture,Caption,BuildNumber
             
             # Add info to a custom object
@@ -71,6 +71,11 @@ Function Get-OSVersion
         return $AllMembers
     }
 }
+<#
+    CHANGELOG
+    01/06/2020
+        Replace Get-WmiObject with Get-CimInstance
+#>
 <#
     Example Output:
     

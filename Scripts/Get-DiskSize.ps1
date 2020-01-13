@@ -72,12 +72,12 @@ function Get-DiskSize
 
         if ($DriveLetter)
         {
-            $Disks = Get-WmiObject -Class Win32_Volume -ComputerName $Computer -ErrorAction SilentlyContinue |
+            $Disks = Get-CimInstance -ClassName Win32_Volume -ComputerName $Computer -ErrorAction SilentlyContinue |
                 Where-Object {$_.DriveLetter -eq $DriveLetter + ":"}
         }
         else
         {
-            $Disks = Get-WmiObject -Class Win32_Volume -ComputerName $Computer -ErrorAction SilentlyContinue |
+            $Disks = Get-CimInstance -ClassName Win32_Volume -ComputerName $Computer -ErrorAction SilentlyContinue |
                 Where-Object {$_.DriveType -eq 3}
         }
 
@@ -134,6 +134,11 @@ function Get-DiskSize
     
     return $AllMembers
 }
+<#
+    CHANGELOG
+    01/06/2020
+        Replace Get-WmiObject with Get-CimInstance
+#>
 <#
     PS C:\> Get-DiskSize | ft
 

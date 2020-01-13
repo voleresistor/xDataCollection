@@ -49,11 +49,11 @@ function Get-Uptime
             }
             
             # Get relevant memory info from WMI on the target computer
-            $OSSpecs = Get-WmiObject -Class Win32_Operatingsystem -ComputerName $target
+            $OSSpecs = Get-CimInstance -ClassName Win32_Operatingsystem -ComputerName $target
             
             # Convert LastBootUpTime into a useful DateTime object and Use it to calculate total uptime
-            $LastBootTime   = $OSSpecs.ConvertToDateTime($OSSpecs.LastBootUpTime)
-            $CurrentTime    = $OSSpecs.ConvertToDateTime($OSSpecs.LocalDateTime)
+            $LastBootTime   = $OSSpecs.LastBootUpTime
+            $CurrentTime    = $OSSpecs.LocalDateTime
             $Uptime         = $CurrentTime - $LastBootTime
             
             # Convert these values to use leading zeroes for consistency
@@ -74,7 +74,7 @@ function Get-Uptime
             #>
             
             # Create a custom object to store our data before returning it
-            $TimeData           = New-Object -TypeName PSObject
+            $TimeData = New-Object -TypeName PSObject
             $TimeData | Add-Member -MemberType NoteProperty -Name ComputerName -Value $Target
             $TimeData | Add-Member -MemberType NoteProperty -Name UpTime -Value $Uptime
             $TimeData | Add-Member -MemberType NoteProperty -Name LastBootTime -Value $LastBootTime
@@ -90,6 +90,11 @@ function Get-Uptime
         return $AllMembers
     }
 }
+<#
+    CHANGELOG
+    01/06/2020
+        Replace Get-WmiObject with Get-CimInstance
+#>
 <#
     Example Output:
     
