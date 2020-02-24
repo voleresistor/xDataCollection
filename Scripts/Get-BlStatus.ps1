@@ -57,8 +57,9 @@ Function Get-BLStatus
         }
 
         # If there is reportable progress, write to PS console
-        Write-Progress -Activity "Encrypting volume $($Volume.MountPoint) on $ComputerName" `
-        -Status "Encryption Progress - $($Volume.EncryptionPercentage)%" -PercentComplete $Volume.EncryptionPercentage
+        Write-Progress -Activity "Encrypting volume $($Volume.MountPoint) on $(if ($ComputerName){$ComputerName} `
+        else{'localhost'})" -Status "Encryption Progress - $($Volume.EncryptionPercentage)%" `
+        -PercentComplete $Volume.EncryptionPercentage
         Start-Sleep -Seconds $SleepSeconds
     }
     until ($Volume.VolumeStatus -eq 'FullyEncrypted')
