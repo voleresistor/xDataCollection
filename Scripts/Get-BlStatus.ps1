@@ -52,13 +52,29 @@ Function Get-BLStatus
 
         # If volume is not being encrypted, let user know (verbose) and break
         if ($Volume.VolumeStatus -eq 'FullyDecrypted') {
-            Write-Verbose "Volume $($Volume.MountPoint) on $($Volume.ComputerName) is not encrypting."
+            Write-Verbose "Volume $($Volume.MountPoint) on $($Volume.ComputerName) is fully decrypted."
             break
         }
 
+        # If volume is encrypted, let user know (verbose) and break
+        if ($Volume.VolumeStatus -eq 'FullyEncrypted') {
+            Write-Verbose "Volume $($Volume.MountPoint) on $($Volume.ComputerName) is fully encrypted."
+            break
+        }
+
+        # Set encrypt/decrypt variables based on current status
+        if ($Volume.VolumeStatus -eq 'EncryptionInProgress') {
+            $Activity = "Encrypting"
+            $Status = "Encryption"
+        }
+        else {
+            $Activity = "Decrypting"
+            $Status = "Decryption"
+        }
+
         # If there is reportable progress, write to PS console
-        Write-Progress -Activity "Encrypting volume $($Volume.MountPoint) on $(if ($ComputerName){$ComputerName} `
-        else{'localhost'})" -Status "Encryption Progress - $($Volume.EncryptionPercentage)%" `
+        Write-Progress -Activity "$Activity volume $($Volume.MountPoint) on $(if ($ComputerName){$ComputerName} `
+        else{'localhost'})" -Status "$Status Progress - $($Volume.EncryptionPercentage)%" `
         -PercentComplete $Volume.EncryptionPercentage
         Start-Sleep -Seconds $SleepSeconds
     }
