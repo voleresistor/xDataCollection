@@ -16,30 +16,61 @@ Function Get-BLStatus
     
     Get encryption progress updates until encryption is completed.
     #>
+
+    [CmdletBinding()]
     param
     (
-        [string]$ComputerName = $env:localhost
+        [Parameter(Mandatory=$false, Position=1)]
+        [string]$ComputerName,
+
+        [Parameter(Mandatory=$false, Position=2)]
+        [int]$SleepSeconds = 5
     )
-    
-    try
-    {
+
+    if ($ComputerName) {
         # Generate a session to run the remote command in
         $BLMonSession = New-PSSession -ComputerName $ComputerName
-        
-        do
-        {
-            $Volume = (Invoke-Command -Session $BLMonSession -ScriptBlock {Get-BitLockerVolume -MountPoint $env:SystemDrive})
-            Write-Progress -Activity "Encrypting volume $($Volume.MountPoint) on $ComputerName" -Status "Encryption Progress - $($Volume.EncryptionPercentage)%" -PercentComplete $Volume.EncryptionPercentage
-            Start-Sleep -Seconds 1
-        }
-        until ($Volume.VolumeStatus -eq 'FullyEncrypted')
     }
     
-    # We want to kill the previously generated session when we're done
-    # no matter what happened in between
-    finally
+    do
     {
-        Remove-PSSession -Id $($a.Id)
+        # Get the volume info
+        if ($BLMonSession) {
+            $Volume = (Invoke-Command -Session $BLMonSession -ScriptBlock { Get-BitLockerVolume `
+            -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue })
+        }
+        else {
+            $Volume = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue
+        }
+
+        # If no volume info, then quit and complain
+        if (!($Volume))
+        {
+            Write-Error "Can't get volume information. Are you admin/elevated?"
+            break
+        }
+
+        # If volume is not being encrypted, let user know (verbose) and break
+        if ($Volume.VolumeStatus -eq 'FullyDecrypted') {
+            Write-Verbose "Volume $($Volume.MountPoint) on $($Volume.ComputerName) is not encrypting."
+            break
+        }
+
+        # If there is reportable progress, write to PS console
+        Write-Progress -Activity "Encrypting volume $($Volume.MountPoint) on $ComputerName" `
+        -Status "Encryption Progress - $($Volume.EncryptionPercentage)%" -PercentComplete $Volume.EncryptionPercentage
+        Start-Sleep -Seconds $SleepSeconds
+    }
+    until ($Volume.VolumeStatus -eq 'FullyEncrypted')
+    
+    # If a remote session exists, clean it up
+    if ($BLMonSession) {
+        Remove-PSSession -Id $($BLMonSession.Id) -ErrorAction SilentlyContinue
     }
 }
+<#
+    CHANGELOG
+    02/24/2020
+        Full rewrite to improve error handling and user friendliness
+#>
 #endregion
