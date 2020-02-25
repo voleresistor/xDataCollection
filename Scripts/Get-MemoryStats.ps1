@@ -1,6 +1,5 @@
 #region Get-MemoryStats
-Function Get-MemoryStats
-{
+Function Get-MemoryStats {
     <#
     .Synopsis
     Displays information about memory usage on local and remote computers
@@ -22,77 +21,53 @@ Function Get-MemoryStats
     
     Get data from multiple computers
     #>
-    param
-    (
+
+    param (
         # Take an array as input so we can pipe a list of computers in
-        [parameter(
+        [parameter (
             ValueFromPipeline=$true,
             ValueFromPipelineByPropertyName=$true
         )]
-        [string[]]$ComputerName = '.'
+        [string]$ComputerName = '.'
     )
 
-    begin
-    {
-        # Create an array to hold our objects
-        $AllMembers = @()
+    # Get relevant memory info from WMI on the target computer
+    try {
+        $MemorySpecs = Get-CimInstance -ClassName Win32_Operatingsystem -ComputerName $ComputerName -ErrorAction SilentlyContinue | Select-Object FreePhysicalMemory,TotalVisibleMemorySize
+    }
+    catch {
+        Write-Error $_.Exception.Message
+        continue
     }
     
-    process
-    {
-        # Loop through each object in the input array
-        foreach ($target in $ComputerName)
-        {
-            # Get relevant memory info from WMI on the target computer
-            try {
-                $MemorySpecs = Get-CimInstance -ClassName Win32_Operatingsystem -ComputerName $target -ErrorAction SilentlyContinue | Select-Object FreePhysicalMemory,TotalVisibleMemorySize
-            }
-            catch {
-                Write-Error $_.Exception.Message
-                continue
-            }
-            
-            # Create some variables using the data from the WMI query
-            $FreeMemory                 = $MemorySpecs.FreePhysicalMemory
-            $TotalMemory                = $MemorySpecs.TotalVisibleMemorySize
-            $UsedMemory                 = $TotalMemory - $FreeMemory
-            
-            if ($FreeMemory -eq $null)
-            {
-                $FreeMemoryPercent = 0
-                $UsedMemoryPercent = 0
-            }
-            else
-            {
-                $FreeMemoryPercent   = "{0:N2}" -f (($FreeMemory / $TotalMemory) * 100)
-                $UsedMemoryPercent   = "{0:N2}" -f (100 - $FreeMemoryPercent)
-            }
-            
-            $FreeMemory            = "{0:N2}" -f ($FreeMemory / 1mb)
-            $TotalMemory           = "{0:N2}" -f ($TotalMemory / 1mb)
-            $UsedMemory            = "{0:N2}" -f ($UsedMemory / 1mb)
-            
-            # Create and populate an object for the data
-            $FreeAndTotal = New-Object -TypeName PSObject
-            $FreeAndTotal | Add-Member -MemberType NoteProperty -Name ComputerName -Value $target
-            $FreeAndTotal | Add-Member -MemberType NoteProperty -Name TotalMemoryGB -Value $TotalMemory
-            $FreeAndTotal | Add-Member -MemberType NoteProperty -Name FreeMemoryGB -Value $FreeMemory
-            $FreeAndTotal | Add-Member -MemberType NoteProperty -Name UsedMemoryGB -Value $UsedMemory
-            $FreeAndTotal | Add-Member -MemberType NoteProperty -Name FreeMemoryPercent -Value $FreeMemoryPercent
-            $FreeAndTotal | Add-Member -MemberType NoteProperty -Name UsedMemoryPercent -Value $UsedMemoryPercent
+    # Create some variables using the data from the WMI query
+    $FreeMemory = $MemorySpecs.FreePhysicalMemory
+    $TotalMemory = $MemorySpecs.TotalVisibleMemorySize
+    $UsedMemory = $TotalMemory - $FreeMemory
+    
+    if ($null -eq $FreeMemory) {
+        $FreeMemoryPercent = 0
+        $UsedMemoryPercent = 0
+    }
+    else {
+        $FreeMemoryPercent   = "{0:N2}" -f (($FreeMemory / $TotalMemory) * 100)
+        $UsedMemoryPercent   = "{0:N2}" -f (100 - $FreeMemoryPercent)
+    }
+    
+    $FreeMemory = Convert-ByteLength -Length $($FreeMemory * 1024) -DesiredSize GB
+    $TotalMemory = Convert-ByteLength -Length $($TotalMemory * 1024) -DesiredSize GB
+    $UsedMemory = Convert-ByteLength -Length $($UsedMemory * 1024) -DesiredSize GB
+    
+    # Create and populate an object for the data
+    $FreeAndTotal = New-Object -TypeName PSObject
+    $FreeAndTotal | Add-Member -MemberType NoteProperty -Name TotalMemoryGB -Value $TotalMemory.Size
+    $FreeAndTotal | Add-Member -MemberType NoteProperty -Name FreeMemoryGB -Value $FreeMemory.Size
+    $FreeAndTotal | Add-Member -MemberType NoteProperty -Name UsedMemoryGB -Value $UsedMemory.Size
+    $FreeAndTotal | Add-Member -MemberType NoteProperty -Name FreeMemoryPercent -Value $FreeMemoryPercent
+    $FreeAndTotal | Add-Member -MemberType NoteProperty -Name UsedMemoryPercent -Value $UsedMemoryPercent
+    $FreeAndTotal | Add-Member -MemberType NoteProperty -Name ComputerName -Value $ComputerName
 
-            # Add object to the collection array
-            $AllMembers += $FreeAndTotal
-            
-            Clear-Variable FreeMemory,TotalMemory,UsedMemory,FreeMemoryPercent,UsedMemoryPercent,MemorySpecs
-        }
-    }
-    
-    end
-    {    
-        # Return the collection array
-        Return $AllMembers
-    }
+    return $FreeAndTotal
 }
 <#
     CHANGELOG
@@ -100,20 +75,28 @@ Function Get-MemoryStats
         Replace Get-WmiObject with Get-CimInstance
     02/24/2020
         Replace $env:computername as default $ComputerName with '.' for Get-CimInstance compatibility
+    02/25/2020
+        Remove loop to take multiple inputs. Convert function to use Convert-ByteLength. Move ComputerName to end
+        of custom object.
 #>
 <#    
     Example Output:
     
-    PS C:\> Get-MemoryStats -ComputerName $(Get-ADComputer -Filter {enabled -eq 'True'}).Name | ft
-    ComputerName TotalMemory FreeMemory UsedMemory FreeMemoryPercent UsedMemoryPercent
-    ------------ ----------- ---------- ---------- ----------------- -----------------
-    RIGEL                839        359        480             42.76             57.24
-    SOL                 1871        865       1006             46.23             53.77
-    APODIS               971        332        639             34.17             65.83
-    VYCANIS            12279       5294       6985             43.11             56.89
-    SADATONI             509        300        209             58.89             41.11
-    DENEB               2777        765       2012             27.54             72.46
-    RANA                 512        337        175             65.85             34.15
-    POLONIUM           32709      25027       7682             76.51             23.49
+    PS C:\> (Get-ADComputer -Filter {Enabled -eq 'True'}).Name | %{ Get-MemoryStats -ComputerName $_ } | ft
+    TotalMemoryGB FreeMemoryGB UsedMemoryGB FreeMemoryPercent UsedMemoryPercent ComputerName
+    ------------- ------------ ------------ ----------------- ----------------- ------------
+                4         0.69          3.3             17.36             82.64 Server1
+                8         5.24         2.76             65.52             34.48 Server2
+                4         1.59         2.41             39.78             60.22 Server3
+               12         2.52         9.48             20.96             79.04 Server4
+                8         6.89         1.11             86.13             13.87 Server5
+                8         3.97         4.03             49.66             50.34 Server6
+                4          2.1          1.9             52.46             47.54 Server7
+               10            9            1             90.03              9.97 Server8
+                8         7.02         0.98             87.75             12.25 Server9
+               16        14.07         1.93             87.94             12.06 Server0
+    snip...
+
+    PS C:\>
 #>
 #endregion

@@ -9,28 +9,29 @@
                 Replace usage of Get-WmiObject with Get-CimInstance for compatibility with PowerShell 7
 
     Included functions:
-        'Get-MemoryStats',
-        'Get-OSVersion',
-        'Get-Uptime',
-        'Get-InstalledSoftware',
-        'Get-FolderSize',
-        'Get-InstalledSoftware',
-        'New-Password',
-        'Get-OldFiles',
-        'Get-DiskSize',
-        'Get-DFSRStats',
-        'Get-LocalTime',
-        'New-RestartTask',
+        'Convert-ByteLength',
         'Get-BLStatus',
-        'Get-RandomWords',
-        'New-RandomPhrase',
-        'Start-CountDown',
-        'Get-ReplStatus',
-        'New-WaitSpan',
+        'Get-DFSRStats',
+        'Get-DiskSize',
         'Get-FileLength',
+        'Get-FolderSize',
         'Get-FoldersWithoutInheritance',
+        'Get-InstalledSoftware',
+        'Get-InstalledSoftware',
+        'Get-LocalTime',
+        'Get-MemoryStats',
+        'Get-OldFiles',
+        'Get-OSVersion',
+        'Get-RandomWords',
         'Get-RegKeyProperties',
-        'Get-UpgradeHistory'
+        'Get-ReplStatus',
+        'Get-UpgradeHistory',
+        'Get-Uptime',
+        'New-Password',
+        'New-RandomPhrase',
+        'New-RestartTask',
+        'New-WaitSpan',
+        'Start-CountDown'
 #>
 
 foreach ($Script in Get-ChildItem -Path "$PSScriptRoot\Scripts" -Filter *.ps1)
