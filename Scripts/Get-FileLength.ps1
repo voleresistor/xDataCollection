@@ -25,8 +25,8 @@ function Get-FileLength
 
     param
     (
-        [Parameter(Mandatory=$true, Position=1)]
-        [string]$Path,
+        [Parameter(Mandatory=$false, Position=1)]
+        [string]$Path = '.',
 
         [Parameter(Mandatory=$false, Position=2)]
         [int]$FileCount = 10,
@@ -95,10 +95,15 @@ function Get-FileLength
 
         foreach ($f in $ten)
         {
+            # Convert file lengths into human readable data
+            $flen = $(Convert-ByteLength -Length $($f.Length))
+
             # Create new objects and add them to our results array
             $x = New-Object -TypeName psobject
-            $x | Add-Member -MemberType NoteProperty -Name Name -Value $($f.FullName)
-            $x | Add-Member -MemberType NoteProperty -Name Size -Value $(ConvertLength -Length $($f.Length))
+            $x | Add-Member -MemberType NoteProperty -Name Name -Value $($f.Name)
+            $x | Add-Member -MemberType NoteProperty -Name Size -Value $($flen.Size)
+            $x | Add-Member -MemberType NoteProperty -Name Unit -Value $($flen.Unit)
+            $x | Add-Member -MemberType NoteProperty -Name FullName -Value $($f.FullName)
             $Results += $x
             Clear-Variable x
 
@@ -106,10 +111,15 @@ function Get-FileLength
         }
     }
 
+    # Convert total length into human readable data
+    $tlen = $(Convert-ByteLength -Length $i)
+
+    # Add total
     $x = New-Object -TypeName psobject
     $x | Add-Member -MemberType NoteProperty -Name Name -Value 'Total'
-    $x | Add-Member -MemberType NoteProperty -Name Size -Value $(ConvertLength -Length $i)
+    $x | Add-Member -MemberType NoteProperty -Name Size -Value $($tlen.Size)
+    $x | Add-Member -MemberType NoteProperty -Name Unit -Value $($tlen.Unit)
     $Results += $x
 
-    return $Results
+    return $Results | Format-Table -AutoSize
 }
