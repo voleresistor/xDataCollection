@@ -18,11 +18,13 @@
 # Not for export
 # ===================
 foreach ($ScriptFile in Get-ChildItem -Path "$PSScriptRoot\Scripts\Private" -Filter *.ps1) {
-    . $_.FullName
+    . $ScriptFile.FullName
 }
 
 # Load each script in the Scripts folder. Individual functions are easier to maintain as scripts rather than
 # all piled up in here.
 foreach ($ScriptFile in Get-ChildItem -Path "$PSScriptRoot\Scripts" -Filter *.ps1) {
-    . $_.FullName
+    . $ScriptFile.FullName
 }
+
+#Export-ModuleMember -Function *
