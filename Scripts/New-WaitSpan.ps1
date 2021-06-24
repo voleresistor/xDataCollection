@@ -33,16 +33,20 @@ function New-WaitSpan
     while ($WaitEnd -gt (Get-Date))
     {
         [timespan]$Current = New-TimeSpan -Start (Get-Date) -End $WaitEnd
-        if ($($Current.Days) -gt 0)
-        {
-            [string]$Status = "{0:D2}" -f $($Current.Days) + ":" + "{0:D2}" -f $($Current.Hours) + ":" + "{0:D2}" -f $($Current.Minutes) + ":" + "{0:D2}" -f $($Current.Seconds)
-        }
-        else
-        {
-            [string]$Status = "{0:D2}" -f $($Current.Hours) + ":" + "{0:D2}" -f $($Current.Minutes) + ":" + "{0:D2}" -f $($Current.Seconds)
-        }
+
+        # Build our data for this cycle
+        # Split uses a simple regex to dump the milliseconds
+        [String]$Status = ($Current.ToString() -split('\.[\d]{7}'))[0]
         [int]$PercentComp = $((($($Initial.TotalSeconds) - $($Current.TotalSeconds)) / $($Initial.TotalSeconds)) * 100)
+
+        # Display and wait
         Write-Progress -Activity $Activity -Status $Status -PercentComplete $PercentComp
         Start-Sleep -Seconds 1
     }
 }
+
+<#
+    Changes
+    05/24/21:
+        Replace complex string builder for timespan with .ToString() TimeSpan method
+#>
